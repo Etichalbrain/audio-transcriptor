@@ -72,6 +72,9 @@ approval steps vary by OS version.
 - **Measured progress**: minutes of audio processed and sentences translated, no invented
   percentages.
 - **Six exports**: Italian/English × TXT, SRT, DOCX.
+- **Interface in English, Italian, German or French**: follows the system language on first
+  launch, switchable in Settings without restarting. The audio language (Italian) and the
+  translation target (English) do not change with it.
 - **Light and dark themes**, background processing, drag and drop.
 
 ## Privacy

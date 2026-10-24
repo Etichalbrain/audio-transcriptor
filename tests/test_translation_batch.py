@@ -100,7 +100,7 @@ class TranslateWithClientTests(unittest.TestCase):
             client=client,
             segments=segments,
             model_name="gpt-5",
-            progress_callback=lambda status, value: progress.append((status, value)),
+            progress_callback=lambda status, value, *_: progress.append((status, value)),
             cancel_checker=lambda: False,
         )
         return result, progress
@@ -115,7 +115,7 @@ class TranslateWithClientTests(unittest.TestCase):
         self.assertEqual([s.index for s in result.segments], [s.index for s in segments])
         self.assertEqual([s.start for s in result.segments], [s.start for s in segments])
         self.assertEqual(result.text.splitlines()[0], "EN 1")
-        self.assertEqual(progress[-1], ("Traduzione completata", 100))
+        self.assertEqual(progress[-1], ("progress.translated", 100))
 
     def test_bad_batch_falls_back_to_one_request_per_segment(self) -> None:
         segments = make_segments(3)
@@ -140,7 +140,7 @@ class TranslateWithClientTests(unittest.TestCase):
                 client=client,
                 segments=make_segments(4),
                 model_name="gpt-5",
-                progress_callback=lambda status, value: None,
+                progress_callback=lambda status, value, *_: None,
                 cancel_checker=lambda: True,
             )
         self.assertEqual(client.responses.calls, [])
@@ -150,7 +150,7 @@ class TranslateWithClientTests(unittest.TestCase):
         result, progress = self.run_translation(client, [])
         self.assertEqual(client.responses.calls, [])
         self.assertEqual(result.segments, [])
-        self.assertEqual(progress[-1], ("Traduzione completata", 100))
+        self.assertEqual(progress[-1], ("progress.translated", 100))
 
 
 class ModeTests(unittest.TestCase):
@@ -162,7 +162,7 @@ class ModeTests(unittest.TestCase):
                 mode="local",
                 api_key="",
                 model_name="gpt-5",
-                progress_callback=lambda status, value: None,
+                progress_callback=lambda status, value, *_: None,
                 cancel_checker=lambda: False,
             )
 
@@ -174,7 +174,7 @@ class ModeTests(unittest.TestCase):
                 mode="openai",
                 api_key="   ",
                 model_name="gpt-5",
-                progress_callback=lambda status, value: None,
+                progress_callback=lambda status, value, *_: None,
                 cancel_checker=lambda: False,
             )
 

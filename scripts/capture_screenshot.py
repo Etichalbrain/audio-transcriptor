@@ -2,7 +2,10 @@
 
 Run from the project root with the development dependencies installed:
 
-    QT_QPA_PLATFORM=offscreen .venv/bin/python scripts/capture_screenshot.py
+    QT_QPA_PLATFORM=offscreen .venv/bin/python scripts/capture_screenshot.py [--lang en] [--out docs]
+
+The README screenshots are in English (the default). Pass --lang it/de/fr to
+check another interface language.
 
 The window is filled with sample text so the screenshot shows the real
 interface instead of empty panes. Nothing is transcribed or sent anywhere.
@@ -10,6 +13,7 @@ interface instead of empty panes. Nothing is transcribed or sent anywhere.
 
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 from pathlib import Path
@@ -44,10 +48,15 @@ ENGLISH = (
 
 
 def main() -> int:
-    app = QApplication(sys.argv)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--lang", default="en", choices=("en", "it", "de", "fr"))
+    parser.add_argument("--out", default=str(ROOT / "docs"))
+    args = parser.parse_args()
+
+    app = QApplication(sys.argv[:1])
     app.setStyle("Fusion")
     # Never load a real user's settings/API key or personal output directory.
-    with patch.object(SettingsStore, "load", return_value=AppSettings()):
+    with patch.object(SettingsStore, "load", return_value=AppSettings(ui_language=args.lang)):
         window = MainWindow()
     window.resize(1100, 820)
     window.set_selected_file(str(ROOT / "intervista_cliente.mp4"))
@@ -69,7 +78,7 @@ def main() -> int:
         for index, line in enumerate(ENGLISH.splitlines())
     ]
     window.progress_bar.setValue(100)
-    window.set_status("Traduzione completata", "ok")
+    window.set_status("progress.translated", "ok")
     window.en_pane.show()
     window.work_splitter.setSizes([1, 1])
     window.update_stats()
@@ -79,7 +88,7 @@ def main() -> int:
     for _ in range(10):
         app.processEvents()
 
-    docs = ROOT / "docs"
+    docs = Path(args.out)
     docs.mkdir(parents=True, exist_ok=True)
     results = []
     for name, widget in (("app.png", window), ("about.png", AboutDialog())):

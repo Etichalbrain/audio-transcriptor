@@ -34,6 +34,10 @@ Open `Impostazioni` to configure:
 The model file is downloaded on first use. While it downloads the status line says so, and
 `Annulla operazione` stops the wait.
 
+Interface language: Settings → General → Interface language offers English, Italiano, Deutsch
+and Français, plus "Same as system" (the default; English if the system language is not one of
+these). The change applies immediately and keeps the open transcript.
+
 Translation always uses the OpenAI API: a key is required in Settings. There is no offline
 translation mode.
 

@@ -23,7 +23,7 @@ class ModelLoadCancelTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             TranscriptionService()._load_model(
                 "small",
-                progress_callback=lambda status, value: None,
+                progress_callback=lambda status, value, *_: None,
                 cancel_checker=lambda: True,
             )
         self.assertLess(time.monotonic() - started, 2, "cancel should not wait for the download")

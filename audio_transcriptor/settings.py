@@ -14,6 +14,7 @@ DEFAULT_MODEL = "small"
 TRANSLATION_MODES = ("openai",)
 LANGUAGES = ("it", "auto")
 THEMES = ("light", "dark")
+UI_LANGUAGES = ("system", "en", "it", "de", "fr")
 
 
 @dataclass
@@ -26,6 +27,7 @@ class AppSettings:
     translation_mode: str = "openai"
     theme: str = "light"
     confirm_translation: bool = True
+    ui_language: str = "system"
 
     def __post_init__(self) -> None:
         # Sanitise values that may come from an older settings file, so the app
@@ -38,6 +40,8 @@ class AppSettings:
             self.translation_mode = "openai"
         if self.theme not in THEMES:
             self.theme = "light"
+        if self.ui_language not in UI_LANGUAGES:
+            self.ui_language = "system"
 
 
 class SettingsStore:

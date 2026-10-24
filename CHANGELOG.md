@@ -5,33 +5,47 @@ All notable changes to AudioTranscriptor. Versions follow the app version in
 
 ## Unreleased
 
+### Interface languages
+
+- The interface is available in **English, Italian, German and French**. On
+  first launch it follows the system language (English when the system uses
+  another language); Settings → General → Interface language changes it
+  immediately, without restarting and without losing the open transcript.
+- All interface text lives in one catalog, `audio_transcriptor/i18n.py`, with
+  plural forms and per-language number formatting. The services report
+  progress as catalog keys, so no user-facing text is hard-coded outside it.
+- Only the interface changes: the audio language (Italian or automatic) and
+  the translation target (English) are unaffected. Legal documents remain in
+  English.
+
 ### Interface
 
-- Progress messages are now in Italian and show measured values: minutes of
-  audio processed during transcription, sentences translated during translation.
+- Progress shows measured values: minutes of audio processed during
+  transcription, sentences translated during translation.
 - The progress bar appears only while a job runs and no longer draws a
   low-contrast percentage; the finished state leaves the space to the text.
-- The transcript counter says "frasi", consistent with the rest of the app.
+- The transcript counter counts sentences, consistent with the rest of the app.
 - The file row no longer shows a stray separator when size is unavailable,
   and shows the media duration as soon as a file is selected.
 - The remove-file button inside the model chip now renders its × and has a
   tooltip and accessible name.
-- Model labels in Settings and the file picker filter are in Italian.
 - Before translating, a confirmation states how many sentences and characters
-  go to OpenAI and with which model; it can be disabled ("Non chiedere più" or
-  Settings). A missing API key is reported before anything is prepared.
+  go to OpenAI and with which model; it can be disabled from the dialog or in
+  Settings. A missing API key is reported before anything is prepared.
 - About dialog reordered: privacy first, then accuracy and warranty, license
   last and shorter. The footer carries the author credit and the local-audio
   promise instead of the license name.
-- DOCX headings: "Trascrizione" for Italian exports, "English translation" for
-  English ones.
+- DOCX headings follow the content language: "Trascrizione" for Italian
+  exports, "English translation" for English ones.
 
 ### Tests
 
-- New offscreen UI tests for counters, progress visibility, file metadata,
-  model chip, and the translation confirmation.
+- Catalog tests: every key in every language, matching placeholders, plural
+  pairs, system-language detection and fallback.
+- Offscreen UI tests for counters, progress visibility, file metadata, model
+  chip, translation confirmation and live language switching.
 
- — 2026-10-22
+## 1.0.1 — 2026-10-22
 
 First release of **AudioTranscriptor** (rename of the previous working name).
 Local faster-whisper transcription of Italian audio and video, optional OpenAI

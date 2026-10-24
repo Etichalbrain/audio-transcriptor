@@ -5,7 +5,7 @@ import sys
 from html import escape
 from pathlib import Path
 
-from PySide6.QtCore import QByteArray, QPointF, QThreadPool, Qt, QUrl, Signal
+from PySide6.QtCore import QByteArray, QLocale, QPointF, QThreadPool, Qt, QUrl, Signal
 from PySide6.QtGui import (
     QColor,
     QDesktopServices,
@@ -38,10 +38,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from audio_transcriptor import __version__
+from audio_transcriptor import __version__, i18n
 from audio_transcriptor.diagnostics import legal_document_path
 from audio_transcriptor.alignment import align_lines_to_segments
 from audio_transcriptor.exporters import write_docx, write_srt, write_txt
+from audio_transcriptor.i18n import tr, tr_n
 from audio_transcriptor.models import TranscriptSegment, is_supported_media
 from audio_transcriptor.services import probe_duration
 from audio_transcriptor.settings import AppSettings, SettingsStore
@@ -51,11 +52,10 @@ from audio_transcriptor.workers import BaseWorker, TranscriptionWorker, Translat
 AUTHOR = "Antonio Aversa"
 PROJECT_URL = "https://aversa.design"
 
-MODEL_CHOICES = (
-    ("small", "small (veloce, circa 0,5 GB da scaricare)"),
-    ("medium", "medium (equilibrato, circa 1,5 GB)"),
-    ("large-v3", "large-v3 (qualità migliore, circa 3 GB)"),
-)
+LICENSE_NAME = "Apache License 2.0 + Commons Clause v1.0"
+
+# Whisper models offered in Settings; their labels live in i18n ("model.<name>").
+MODEL_CHOICES = ("small", "medium", "large-v3")
 
 # ---------------------------------------------------------------------------
 # New-interface design tokens (light): warm paper-grey background, white cards,
@@ -491,10 +491,12 @@ def _card(title: str | None = None) -> tuple[QFrame, QVBoxLayout]:
     layout = QVBoxLayout(frame)
     layout.setContentsMargins(16, 14, 16, 14)
     layout.setSpacing(10)
-    if title:
+    frame.heading = None
+    if title is not None:
         heading = QLabel(title)
         heading.setObjectName("cardTitle")
         layout.addWidget(heading)
+        frame.heading = heading
     return frame, layout
 
 
@@ -505,26 +507,40 @@ def _dot_label(color: str) -> QLabel:
     return dot
 
 
+def system_ui_languages() -> list[str]:
+    """The operating system's preferred interface languages, most preferred first."""
+    return list(QLocale.system().uiLanguages()) or [QLocale.system().name()]
+
+
 class SettingsDialog(QDialog):
-    """Impostazioni: sections 'Modello' and 'Traduzione', output and theme."""
+    """Settings: transcription model, translation, interface language, output and theme."""
 
     def __init__(self, settings: AppSettings, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Impostazioni")
-        self.setMinimumWidth(520)
+        self.setWindowTitle(tr("header.settings"))
+        self.setMinimumWidth(540)
 
         self.model_combo = QComboBox()
-        for value, label in MODEL_CHOICES:
-            self.model_combo.addItem(label, value)
+        for value in MODEL_CHOICES:
+            self.model_combo.addItem(tr(f"model.{value}"), value)
         self.model_combo.setCurrentIndex(max(0, self.model_combo.findData(settings.model_name)))
 
         self.language_combo = QComboBox()
-        self.language_combo.addItem("Italiano", "it")
-        self.language_combo.addItem("Automatico", "auto")
+        self.language_combo.addItem(tr("settings.audio_italian"), "it")
+        self.language_combo.addItem(tr("settings.audio_auto"), "auto")
         self.language_combo.setCurrentIndex(0 if settings.language == "it" else 1)
 
+        self.ui_language_combo = QComboBox()
+        self.ui_language_combo.addItem(tr("settings.interface_system"), "system")
+        for code in i18n.LANGUAGES:
+            # Each language is shown in itself, so it can be found from any language.
+            self.ui_language_combo.addItem(i18n.LANGUAGE_NAMES[code], code)
+        self.ui_language_combo.setCurrentIndex(
+            max(0, self.ui_language_combo.findData(settings.ui_language))
+        )
+
         self.output_edit = QLineEdit(settings.output_folder)
-        output_button = QPushButton("Sfoglia…")
+        output_button = QPushButton(tr("action.browse"))
         output_button.setObjectName("secondary")
         output_button.clicked.connect(self.choose_output_folder)
         output_row = QHBoxLayout()
@@ -534,66 +550,59 @@ class SettingsDialog(QDialog):
         self.api_key_edit = QLineEdit(settings.openai_api_key)
         self.api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.openai_model_edit = QLineEdit(settings.openai_model)
-        self.confirm_translation_check = QCheckBox(
-            "Chiedi conferma prima di inviare il testo a OpenAI"
-        )
+        self.confirm_translation_check = QCheckBox(tr("settings.confirm_translation"))
         self.confirm_translation_check.setChecked(settings.confirm_translation)
-        self._settings = settings
 
         self.theme_combo = QComboBox()
-        self.theme_combo.addItem("Chiaro", "light")
-        self.theme_combo.addItem("Scuro", "dark")
+        self.theme_combo.addItem(tr("settings.theme_light"), "light")
+        self.theme_combo.addItem(tr("settings.theme_dark"), "dark")
         self.theme_combo.setCurrentIndex(0 if settings.theme == "light" else 1)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(18, 16, 18, 16)
         root.setSpacing(12)
 
-        # Modello section
-        model_card, model_layout = _card("Modello di trascrizione")
+        model_card, model_layout = _card(tr("settings.section_model"))
         grid = QGridLayout()
         grid.setHorizontalSpacing(10)
         grid.setVerticalSpacing(8)
-        grid.addWidget(QLabel("Modello Whisper"), 0, 0)
+        grid.addWidget(QLabel(tr("settings.whisper_model")), 0, 0)
         grid.addWidget(self.model_combo, 0, 1)
-        grid.addWidget(QLabel("Lingua"), 1, 0)
+        grid.addWidget(QLabel(tr("settings.audio_language")), 1, 0)
         grid.addWidget(self.language_combo, 1, 1)
         model_layout.addLayout(grid)
         root.addWidget(model_card)
 
-        # Traduzione section
-        trans_card, trans_layout = _card("Traduzione")
-        hint = QLabel("La traduzione usa l’API OpenAI con la tua chiave.")
+        trans_card, trans_layout = _card(tr("settings.section_translation"))
+        hint = QLabel(tr("settings.translation_hint"))
         hint.setObjectName("muted")
         trans_layout.addWidget(hint)
         tgrid = QGridLayout()
         tgrid.setHorizontalSpacing(10)
         tgrid.setVerticalSpacing(8)
-        key_label = QLabel("Chiave API")
-        api_row = QHBoxLayout()
-        api_row.addWidget(self.api_key_edit, stretch=1)
-        tgrid.addWidget(key_label, 0, 0)
-        tgrid.addLayout(api_row, 0, 1)
-        tgrid.addWidget(QLabel("Modello OpenAI"), 1, 0)
+        tgrid.addWidget(QLabel(tr("settings.api_key")), 0, 0)
+        tgrid.addWidget(self.api_key_edit, 0, 1)
+        tgrid.addWidget(QLabel(tr("settings.openai_model")), 1, 0)
         tgrid.addWidget(self.openai_model_edit, 1, 1)
         trans_layout.addLayout(tgrid)
         trans_layout.addWidget(self.confirm_translation_check)
         root.addWidget(trans_card)
 
-        # General section
-        gen_card, gen_layout = _card("Generale")
+        gen_card, gen_layout = _card(tr("settings.section_general"))
         ggrid = QGridLayout()
         ggrid.setHorizontalSpacing(10)
         ggrid.setVerticalSpacing(8)
-        ggrid.addWidget(QLabel("Cartella di output"), 0, 0)
-        ggrid.addLayout(output_row, 0, 1)
-        ggrid.addWidget(QLabel("Tema"), 1, 0)
-        ggrid.addWidget(self.theme_combo, 1, 1)
+        ggrid.addWidget(QLabel(tr("settings.interface_language")), 0, 0)
+        ggrid.addWidget(self.ui_language_combo, 0, 1)
+        ggrid.addWidget(QLabel(tr("settings.output_folder")), 1, 0)
+        ggrid.addLayout(output_row, 1, 1)
+        ggrid.addWidget(QLabel(tr("settings.theme")), 2, 0)
+        ggrid.addWidget(self.theme_combo, 2, 1)
         gen_layout.addLayout(ggrid)
         root.addWidget(gen_card)
 
-        save_button = QPushButton("Salva")
-        cancel_button = QPushButton("Annulla")
+        save_button = QPushButton(tr("action.save"))
+        cancel_button = QPushButton(tr("action.cancel"))
         cancel_button.setObjectName("secondary")
         save_button.clicked.connect(self.accept)
         cancel_button.clicked.connect(self.reject)
@@ -605,7 +614,7 @@ class SettingsDialog(QDialog):
 
     def choose_output_folder(self) -> None:
         folder = QFileDialog.getExistingDirectory(
-            self, "Scegli la cartella di output", self.output_edit.text()
+            self, tr("settings.choose_folder"), self.output_edit.text()
         )
         if folder:
             self.output_edit.setText(folder)
@@ -620,11 +629,12 @@ class SettingsDialog(QDialog):
             translation_mode="openai",
             theme="dark" if self.theme_combo.currentData() == "dark" else "light",
             confirm_translation=self.confirm_translation_check.isChecked(),
+            ui_language=self.ui_language_combo.currentData(),
         )
 
 
 class ExportDialog(QDialog):
-    """Pannello Esporta: TXT / SRT / DOCX per Italiano ed Inglese."""
+    """Export panel: TXT / SRT / DOCX for the Italian text and the English translation."""
 
     def __init__(
         self,
@@ -633,7 +643,7 @@ class ExportDialog(QDialog):
         output_folder: str,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Esporta")
+        self.setWindowTitle(tr("export.window"))
         self.setMinimumWidth(560)
         self.flags = flags
         self.output_folder = output_folder
@@ -642,11 +652,11 @@ class ExportDialog(QDialog):
         root.setContentsMargins(18, 16, 18, 16)
         root.setSpacing(12)
 
-        title = QLabel("Esporta trascrizione")
+        title = QLabel(tr("export.title"))
         title.setStyleSheet("font-size: 17px; font-weight: 700;")
         root.addWidget(title)
 
-        intro = QLabel("Scegli il formato: i file vengono salvati nella cartella di output.")
+        intro = QLabel(tr("export.intro"))
         intro.setObjectName("muted")
         intro.setWordWrap(True)
         root.addWidget(intro)
@@ -655,13 +665,13 @@ class ExportDialog(QDialog):
         grid.setHorizontalSpacing(10)
         grid.setVerticalSpacing(10)
         grid.addWidget(QLabel(""), 0, 0)
-        grid.addWidget(QLabel("Italiano"), 0, 1)
-        grid.addWidget(QLabel("Inglese"), 0, 2)
+        grid.addWidget(QLabel(tr("pane.italian")), 0, 1)
+        grid.addWidget(QLabel(tr("pane.english")), 0, 2)
         for row, kind in enumerate(("txt", "srt", "docx"), start=1):
             grid.addWidget(QLabel(kind.upper()), row, 0)
             for col, lang in ((1, "it"), (2, "en")):
                 key = f"{lang}_{kind}"
-                button = QPushButton(f"Esporta {kind.upper()}")
+                button = QPushButton(tr("export.button", fmt=kind.upper()))
                 button.setObjectName("secondary")
                 button.setEnabled(flags.get(key, False))
                 button.clicked.connect(
@@ -671,12 +681,12 @@ class ExportDialog(QDialog):
         root.addLayout(grid)
 
         folder_row = QHBoxLayout()
-        folder_label = QLabel("Cartella:")
+        folder_label = QLabel(tr("export.folder"))
         folder_label.setObjectName("muted")
-        self.folder_label = QLabel(output_folder or "— (accanto al file selezionato)")
+        self.folder_label = QLabel(output_folder or tr("export.folder_default"))
         self.folder_label.setObjectName("muted")
         self.folder_label.setWordWrap(True)
-        open_button = QPushButton("Apri cartella")
+        open_button = QPushButton(tr("action.open_folder"))
         open_button.setObjectName("ghost")
         open_button.clicked.connect(self.open_folder)
         folder_row.addWidget(folder_label)
@@ -684,7 +694,7 @@ class ExportDialog(QDialog):
         folder_row.addWidget(open_button)
         root.addLayout(folder_row)
 
-        close_button = QPushButton("Chiudi")
+        close_button = QPushButton(tr("action.close"))
         close_button.setObjectName("secondary")
         close_button.clicked.connect(self.accept)
         buttons = QHBoxLayout()
@@ -713,33 +723,33 @@ class TranslationConfirmDialog(QDialog):
         self, parent: QWidget | None, sentences: int, characters: int, model: str
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Traduci in inglese")
+        self.setWindowTitle(tr("action.translate"))
         self.setMinimumWidth(480)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(20, 18, 20, 18)
         root.setSpacing(12)
 
-        title = QLabel("Il testo verrà inviato a OpenAI")
+        title = QLabel(tr("confirm.title"))
         title.setStyleSheet("font-size: 17px; font-weight: 700;")
         root.addWidget(title)
 
-        frasi = "1 frase" if sentences == 1 else f"{sentences} frasi"
-        caratteri = f"{characters:,}".replace(",", ".")
         body = QLabel(
-            f"Invierai <b>{frasi}</b> ({caratteri} caratteri) al modello "
-            f"<b>{escape(model)}</b> con la tua chiave API. L’audio resta su questo "
-            "computer.<br><br>Il costo dipende dal modello scelto e viene addebitato "
-            "sul tuo account OpenAI."
+            tr(
+                "confirm.body",
+                sentences=tr_n("work.sentences", sentences),
+                chars=i18n.format_int(characters),
+                model=escape(model),
+            )
         )
         body.setWordWrap(True)
         root.addWidget(body)
 
-        self.dont_ask = QCheckBox("Non chiedere più (modificabile in Impostazioni)")
+        self.dont_ask = QCheckBox(tr("confirm.dont_ask"))
         root.addWidget(self.dont_ask)
 
-        send_button = QPushButton("Traduci")
-        cancel_button = QPushButton("Annulla")
+        send_button = QPushButton(tr("confirm.send"))
+        cancel_button = QPushButton(tr("action.cancel"))
         cancel_button.setObjectName("secondary")
         send_button.clicked.connect(self.accept)
         cancel_button.clicked.connect(self.reject)
@@ -755,11 +765,11 @@ class TranslationConfirmDialog(QDialog):
 
 
 class AboutDialog(QDialog):
-    """Credit, license and privacy summary, reachable from the main window."""
+    """Credit, privacy, accuracy and license summary, reachable from the main window."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Informazioni")
+        self.setWindowTitle(tr("header.about"))
         self.setMinimumWidth(560)
 
         root = QVBoxLayout(self)
@@ -774,7 +784,7 @@ class AboutDialog(QDialog):
         title = QLabel(f"AudioTranscriptor {__version__}")
         title.setStyleSheet("font-size: 19px; font-weight: 700;")
         author = QLabel(
-            f'Realizzato da {AUTHOR} · '
+            f'{escape(tr("about.made_by", author=AUTHOR))} · '
             f'<a href="{PROJECT_URL}">{PROJECT_URL.replace("https://", "")}</a>'
         )
         author.setObjectName("muted")
@@ -785,37 +795,34 @@ class AboutDialog(QDialog):
         root.addLayout(head)
 
         # Read legal texts shipped with the app, not unverified website routes.
-        document_urls = {}
+        # The legal documents themselves are in English, whatever the interface.
+        urls = {}
         for name in ("LICENSE", "PRIVACY.md", "TERMS.md", "THIRD_PARTY_NOTICES.md"):
             path = legal_document_path(name)
-            document_urls[name] = escape(path.as_uri() if path else PROJECT_URL, quote=True)
+            urls[name] = escape(path.as_uri() if path else PROJECT_URL, quote=True)
+
+        def link(name: str, key: str) -> str:
+            return f'<a href="{urls[name]}">{escape(tr(key))}</a>'
 
         body = QLabel(
-            "<p><b>L’audio resta su questo computer.</b> La trascrizione gira in "
-            "locale e non vengono raccolti dati di utilizzo. Solo quando premi "
-            "<i>Traduci in inglese</i> il testo (mai l’audio) viene inviato "
-            "all’API OpenAI con la tua chiave. "
-            f"<a href=\"{document_urls['PRIVACY.md']}\">Dettagli sulla privacy</a>.</p>"
-            "<p><b>Verifica sempre il testo.</b> Trascrizioni e traduzioni sono "
-            "generate da modelli di IA e possono contenere errori, soprattutto "
-            "su nomi e cifre. L’app è fornita così com’è, senza garanzia né "
-            "obbligo di assistenza; il consenso alla registrazione è tua "
-            f'responsabilità. <a href="{document_urls["TERMS.md"]}">Termini di utilizzo</a>.</p>'
-            "<p><b>Licenza.</b> Uso personale e professionale gratuito, anche per "
-            "lavoro retribuito. Apache License 2.0 + Commons Clause v1.0: "
-            "source-available, non open source; non è consentito vendere un "
-            "prodotto o servizio basato sostanzialmente su questa app. "
-            f'<a href="{document_urls["LICENSE"]}">Licenza completa</a> · '
-            f'<a href="{document_urls["THIRD_PARTY_NOTICES.md"]}">componenti di terze parti</a> '
-            "(Qt, Whisper e altri) · "
-            f'permessi separati su <a href="{PROJECT_URL}">aversa.design</a>.</p>'
+            f"<p><b>{tr('about.privacy_title')}</b> "
+            f"{tr('about.privacy_body', translate=escape(tr('action.translate')))} "
+            f"{link('PRIVACY.md', 'about.privacy_link')}.</p>"
+            f"<p><b>{tr('about.accuracy_title')}</b> {tr('about.accuracy_body')} "
+            f"{link('TERMS.md', 'about.terms_link')}.</p>"
+            f"<p><b>{tr('about.license_title')}</b> "
+            f"{tr('about.license_body', license=LICENSE_NAME)} "
+            f"{link('LICENSE', 'about.license_link')} · "
+            f"{link('THIRD_PARTY_NOTICES.md', 'about.third_party_link')} "
+            f"{tr('about.third_party_list')} · {tr('about.permissions')} "
+            f'<a href="{PROJECT_URL}">aversa.design</a>.</p>'
         )
         body.setWordWrap(True)
         body.setOpenExternalLinks(True)
         body.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
         root.addWidget(body, stretch=1)
 
-        close_button = QPushButton("Chiudi")
+        close_button = QPushButton(tr("action.close"))
         close_button.clicked.connect(self.accept)
         buttons = QHBoxLayout()
         buttons.addStretch()
@@ -833,6 +840,7 @@ class MainWindow(QMainWindow):
 
         self.settings_store = SettingsStore()
         self.settings = self.settings_store.load()
+        self.apply_language()
         self.thread_pool = QThreadPool.globalInstance()
         self.current_worker: BaseWorker | None = None
         self.selected_file: Path | None = None
@@ -841,9 +849,14 @@ class MainWindow(QMainWindow):
         self._last_output_folder: Path | None = None
         self._status_kind = "idle"
         self._file_duration: float | None = None
+        # What is on screen, kept as i18n keys so a language switch can redraw it.
+        self._status: tuple[str, dict] = ("status.ready", {})
+        self._error: tuple[str | None, str] | None = None
+        self._success: tuple[str, str] | None = None
+        self._chip_state = "idle"
 
         # Status row
-        self.status_label = QLabel("Pronto")
+        self.status_label = QLabel()
         self.status_dot = _dot_label("#c4cbd9")
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
@@ -852,15 +865,15 @@ class MainWindow(QMainWindow):
         self.progress_bar.setTextVisible(False)
         self.progress_bar.setFixedHeight(8)
         self.progress_bar.hide()
-        self.cancel_button = QPushButton("Annulla operazione")
+        self.cancel_button = QPushButton()
         self.cancel_button.setObjectName("danger")
         self.cancel_button.clicked.connect(self.cancel_process)
 
         # Header
-        self.about_button = QPushButton("Informazioni")
+        self.about_button = QPushButton()
         self.about_button.setObjectName("ghost")
         self.about_button.clicked.connect(self.show_about)
-        self.settings_button = QPushButton("Impostazioni")
+        self.settings_button = QPushButton()
         self.settings_button.setObjectName("ghost")
         self.settings_button.clicked.connect(self.open_settings)
 
@@ -875,17 +888,17 @@ class MainWindow(QMainWindow):
                 "font-size: 44px; color: #1d45f5; background: #e8ecff; "
                 "border-radius: 22px; min-width: 88px; min-height: 88px;"
             )
-        self.hero_title = QLabel("Trascina qui un file audio o video")
+        self.hero_title = QLabel()
         self.hero_title.setObjectName("heroTitle")
         self.hero_hint = QLabel("MP3 · WAV · M4A · MP4 · MOV · MKV")
         self.hero_hint.setObjectName("muted")
-        self.select_button = QPushButton("Scegli file")
+        self.select_button = QPushButton()
         self.select_button.setObjectName("secondary")
         self.select_button.clicked.connect(self.choose_file)
 
         self.file_icon = QLabel("🎞️")
         self.file_icon.setStyleSheet("font-size: 18px;")
-        self.filename_label = QLabel("Nessun file selezionato")
+        self.filename_label = QLabel()
         self.filename_label.setStyleSheet("font-weight: 600;")
         self.file_meta_label = QLabel("")
         self.file_meta_label.setObjectName("muted")
@@ -895,7 +908,7 @@ class MainWindow(QMainWindow):
         chip_layout.setContentsMargins(10, 4, 10, 4)
         chip_layout.setSpacing(6)
         self.model_dot = _dot_label("#c4cbd9")
-        self.model_chip_label = QLabel("Modello: small")
+        self.model_chip_label = QLabel()
         self.model_chip_label.setObjectName("chipText")
         chip_layout.addWidget(self.model_dot)
         chip_layout.addWidget(self.model_chip_label)
@@ -907,44 +920,35 @@ class MainWindow(QMainWindow):
         self.remove_file_button.setStyleSheet(
             "padding: 0; font-size: 16px; font-weight: 600; border-radius: 12px;"
         )
-        self.remove_file_button.setToolTip("Rimuovi file")
-        self.remove_file_button.setAccessibleName("Rimuovi file")
         self.remove_file_button.clicked.connect(self.clear_file)
         chip_layout.addWidget(self.remove_file_button)
-        self.transcribe_button = QPushButton("Trascrivi in italiano")
+        self.transcribe_button = QPushButton()
         self.transcribe_button.clicked.connect(self.start_transcription)
-        self.change_file_button = QPushButton("Cambia file")
+        self.change_file_button = QPushButton()
         self.change_file_button.setObjectName("secondary")
         self.change_file_button.clicked.connect(self.choose_file)
 
         # Work area
-        self.work_title = QLabel("Trascrizione")
+        self.work_title = QLabel()
         self.work_title.setObjectName("cardTitle")
         self.work_stats = QLabel("")
         self.work_stats.setObjectName("muted")
-        self.translate_button = QPushButton("Traduci in inglese")
+        self.translate_button = QPushButton()
         self.translate_button.clicked.connect(self.start_translation)
-        self.export_button = QPushButton("Esporta…")
+        self.export_button = QPushButton()
         self.export_button.setObjectName("secondary")
         self.export_button.clicked.connect(self.open_export_dialog)
 
         self.italian_text = QTextEdit()
-        self.italian_text.setPlaceholderText(
-            "La trascrizione in italiano apparirà qui. Puoi correggere il testo prima "
-            "di tradurlo o esportarlo."
-        )
         self.italian_text.textChanged.connect(self.update_actions)
         self.italian_text.textChanged.connect(self.update_stats)
         self.english_text = QTextEdit()
-        self.english_text.setPlaceholderText(
-            "La traduzione in inglese apparirà qui, accanto all’italiano."
-        )
         self.english_text.textChanged.connect(self.update_actions)
         self.english_text.textChanged.connect(self.update_stats)
 
-        self.it_pane_title = QLabel("Italiano")
+        self.it_pane_title = QLabel()
         self.it_pane_title.setObjectName("paneTitle")
-        self.en_pane_title = QLabel("Inglese")
+        self.en_pane_title = QLabel()
         self.en_pane_title.setObjectName("paneTitle")
         self.it_pane_count = QLabel("")
         self.it_pane_count.setObjectName("muted")
@@ -954,19 +958,19 @@ class MainWindow(QMainWindow):
         # Banners
         self.error_label = QLabel("")
         self.error_label.setWordWrap(True)
-        self.error_dismiss = QPushButton("Chiudi")
+        self.error_dismiss = QPushButton()
         self.error_dismiss.setObjectName("secondary")
         self.error_dismiss.clicked.connect(self.hide_error_banner)
         self.success_label = QLabel("")
         self.success_label.setWordWrap(True)
-        self.open_folder_button = QPushButton("Apri cartella")
+        self.open_folder_button = QPushButton()
         self.open_folder_button.setObjectName("success")
         self.open_folder_button.clicked.connect(self.open_output_folder)
 
         self.setCentralWidget(self.build_layout())
         self.apply_theme()
+        self.retranslate_ui()
         self.update_actions()
-        self.update_stats()
 
     def build_layout(self) -> QWidget:
         root = QWidget()
@@ -1035,7 +1039,8 @@ class MainWindow(QMainWindow):
         self.drop_zone.vbox().addWidget(self.file_panel)
 
         # --- Status card -----------------------------------------------------
-        status_card, status_layout = _card("Stato")
+        status_card, status_layout = _card("")
+        self.status_title = status_card.heading
         status_row = QHBoxLayout()
         status_row.setSpacing(8)
         status_row.addWidget(self.status_dot)
@@ -1121,10 +1126,8 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.success_banner)
 
         # --- Footer -------------------------------------------------------------
-        footer = QLabel(
-            f"AudioTranscriptor di {AUTHOR} · aversa.design · "
-            "l’audio resta su questo computer"
-        )
+        footer = QLabel()
+        self.footer_label = footer
         footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
         footer.setObjectName("muted")
         footer.setStyleSheet("padding-top: 4px;")
@@ -1147,12 +1150,11 @@ class MainWindow(QMainWindow):
         except OSError:
             pass
         if self._file_duration:
-            parts.append(f"durata {_fmt_time(self._file_duration)}")
+            parts.append(tr("file.duration", time=_fmt_time(self._file_duration)))
         self.file_meta_label.setText(" · ".join(parts))
         self.file_meta_label.setVisible(bool(parts))
-        model_name = self.settings.model_name
-        self.model_chip_label.setText(f"Modello: {model_name}")
-        self.model_dot.setStyleSheet("background: #c4cbd9; border-radius: 5px;")
+        self._chip_state = "idle"
+        self._render_chip()
         self.hero_panel.hide()
         self.file_panel.show()
         self.drop_zone.setMinimumHeight(84)
@@ -1170,12 +1172,68 @@ class MainWindow(QMainWindow):
             DARK_STYLE if self.settings.theme == "dark" else LIGHT_STYLE
         )
 
+    def apply_language(self) -> None:
+        i18n.set_language(
+            i18n.resolve_language(self.settings.ui_language, system_ui_languages())
+        )
+
+    def retranslate_ui(self) -> None:
+        """Set every visible string from the current language, keeping the state."""
+        self.about_button.setText(tr("header.about"))
+        self.settings_button.setText(tr("header.settings"))
+        self.hero_title.setText(tr("hero.title"))
+        self.select_button.setText(tr("hero.choose"))
+        if self.selected_file is None:
+            self.filename_label.setText(tr("file.none"))
+        self.remove_file_button.setToolTip(tr("file.remove"))
+        self.remove_file_button.setAccessibleName(tr("file.remove"))
+        self.transcribe_button.setText(tr("action.transcribe"))
+        self.change_file_button.setText(tr("file.change"))
+        self.cancel_button.setText(tr("action.cancel_job"))
+        self.status_title.setText(tr("status.title"))
+        self.work_title.setText(tr("work.title"))
+        self.translate_button.setText(tr("action.translate"))
+        self.export_button.setText(tr("action.export"))
+        self.italian_text.setPlaceholderText(tr("placeholder.italian"))
+        self.english_text.setPlaceholderText(tr("placeholder.english"))
+        self.it_pane_title.setText(tr("pane.italian"))
+        self.en_pane_title.setText(tr("pane.english"))
+        self.error_dismiss.setText(tr("action.close"))
+        self.open_folder_button.setText(tr("action.open_folder"))
+        self.footer_label.setText(tr("footer", author=AUTHOR))
+        key, params = self._status
+        self.status_label.setText(tr(key, **params))
+        if self._error is not None:
+            self.error_label.setText(self._error_text())
+        if self._success is not None:
+            name, folder = self._success
+            self.success_label.setText(tr("success.saved", name=name, folder=folder))
+        if self.selected_file is not None:
+            self.populate_hero()
+        self._render_chip()
+        self.update_stats()
+
+    def _render_chip(self) -> None:
+        name = self.settings.model_name
+        if self._chip_state == "downloading":
+            text, color = tr("chip.downloading", name=name), ACCENT
+        elif self._chip_state == "loading":
+            text, color = tr("chip.loading", name=name), ACCENT
+        elif self._chip_state == "ready":
+            text, color = tr("chip.model", name=name), SUCCESS
+        else:
+            text, color = tr("chip.model", name=name), "#c4cbd9"
+        if getattr(self, "_chip_style", None) != (text, color):
+            self._chip_style = (text, color)
+            self.model_chip_label.setText(text)
+            self.model_dot.setStyleSheet(f"background: {color}; border-radius: 5px;")
+
     def choose_file(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self,
-            "Seleziona file audio o video",
+            tr("dialog.open_media"),
             "",
-            "File audio e video (*.mp3 *.wav *.m4a *.mp4 *.mov *.mkv)",
+            f"{tr('dialog.media_filter')} (*.mp3 *.wav *.m4a *.mp4 *.mov *.mkv)",
         )
         if path:
             self.set_selected_file(path)
@@ -1185,14 +1243,12 @@ class MainWindow(QMainWindow):
             return
         candidate = Path(path)
         if not is_supported_media(candidate):
-            self.show_error(
-                "Scegli un file MP3, WAV, M4A, MP4, MOV o MKV supportato."
-            )
+            self.show_error_key("error.unsupported")
             return
         self.selected_file = candidate
         self._file_duration = probe_duration(candidate)
         self.hide_error_banner()
-        self.set_status("File selezionato", "idle")
+        self.set_status("status.file_selected", "idle")
         self.progress_bar.setValue(0)
         self.populate_hero()
         self.update_actions()
@@ -1206,8 +1262,10 @@ class MainWindow(QMainWindow):
         self.english_text.clear()
         self.en_pane.hide()
         self.success_banner.hide()
+        self._success = None
         self.hide_error_banner()
-        self.set_status("Pronto", "idle")
+        self.filename_label.setText(tr("file.none"))
+        self.set_status("status.ready", "idle")
         self.progress_bar.setValue(0)
         self.populate_hero()
         self.update_actions()
@@ -1221,10 +1279,11 @@ class MainWindow(QMainWindow):
             self.settings = dialog.updated_settings()
             self.settings_store.save(self.settings)
             self.apply_theme()
-            if self.selected_file is not None:
-                self.populate_hero()
+            self.apply_language()
+            self.retranslate_ui()
             # refresh theme-dependent inline colours, keeping the current state
-            self.set_status(self.status_label.text(), self._status_kind)
+            key, params = self._status
+            self.set_status(key, self._status_kind, params)
             if self._status_kind == "busy":
                 self.set_status_dot_busy()
             self.update_actions()
@@ -1234,13 +1293,10 @@ class MainWindow(QMainWindow):
         if self.selected_file is None:
             return
         if not self.ensure_disk_space(self.selected_file):
-            self.show_error(
-                "Potrebbe non esserci spazio su disco sufficiente per elaborare "
-                "questo file."
-            )
+            self.show_error_key("error.disk_precheck")
             return
         self.hide_error_banner()
-        self.set_processing("Preparazione audio…", 0)
+        self.set_processing("status.preparing_audio", 0)
         self.italian_text.clear()
         self.english_text.clear()
         self.translation_segments = []
@@ -1260,13 +1316,13 @@ class MainWindow(QMainWindow):
         if not text:
             return
         if not self.settings.openai_api_key.strip():
-            self.show_error("Add an OpenAI API key in Settings before translating.")
+            self.show_error_key("error.api_key")
             return
         self.hide_error_banner()
         self.sync_edited_transcript_to_segments(text)
         if self.settings.confirm_translation and not self.confirm_translation_send(text):
             return
-        self.set_processing("Traduzione…", 0)
+        self.set_processing("progress.translating", 0)
         worker = TranslationWorker(text, self.transcript_segments, self.settings)
         worker.signals.progress.connect(self.set_processing)
         worker.signals.translated.connect(self.on_translated)
@@ -1293,14 +1349,15 @@ class MainWindow(QMainWindow):
     def cancel_process(self) -> None:
         if self.current_worker is not None:
             self.current_worker.cancel()
-            self.set_status("Annullamento…", "warn")
+            self.set_status("status.cancelling", "warn")
 
     def on_transcribed(self, result) -> None:
         self.transcript_segments = result.segments
         self.italian_text.setPlainText(result.text)
-        self.set_status("Trascrizione completata", "ok")
+        self.set_status("progress.transcribed", "ok")
         self.progress_bar.setValue(100)
-        self.model_dot.setStyleSheet("background: #1f9d55; border-radius: 5px;")
+        self._chip_state = "ready"
+        self._render_chip()
         self.update_actions()
         self.update_stats()
 
@@ -1309,7 +1366,7 @@ class MainWindow(QMainWindow):
         self.english_text.setPlainText(result.text)
         self.en_pane.show()
         self.work_splitter.setSizes([1, 1])
-        self.set_status("Traduzione completata", "ok")
+        self.set_status("progress.translated", "ok")
         self.progress_bar.setValue(100)
         self.update_actions()
         self.update_stats()
@@ -1319,7 +1376,7 @@ class MainWindow(QMainWindow):
         self.update_actions()
 
     # --- Status / progress / errors -----------------------------------------
-    def set_status(self, text: str, kind: str) -> None:
+    def set_status(self, key: str, kind: str, params: dict | None = None) -> None:
         colors = {
             "idle": "#c4cbd9",
             "busy": ACCENT if self.settings.theme == "light" else D_ACCENT,
@@ -1329,19 +1386,21 @@ class MainWindow(QMainWindow):
         }
         self._status_kind = kind
         self._dot_color = colors.get(kind, "#c4cbd9")
-        self.status_label.setText(text)
+        self._status = (key, dict(params or {}))
+        self.status_label.setText(tr(key, **self._status[1]))
         self._refresh_dot(self._dot_color)
         # The bar is only useful while something runs: once the job is done
         # the space goes back to the transcript.
         self.progress_bar.setVisible(kind in ("busy", "warn"))
 
-    def set_processing(self, status: str, progress: int) -> None:
+    def set_processing(self, key: str, progress: int, params: dict | None = None) -> None:
         self._status_kind = "busy"
-        self.status_label.setText(status)
+        self._status = (key, dict(params or {}))
+        self.status_label.setText(tr(key, **self._status[1]))
         self.set_status_dot_busy()
         self.progress_bar.setValue(progress)
         self.progress_bar.show()
-        self.update_model_chip_from_status(status)
+        self.update_model_chip_from_status(key)
 
     def set_status_dot_busy(self) -> None:
         color = ACCENT if self.settings.theme == "light" else D_ACCENT
@@ -1355,49 +1414,56 @@ class MainWindow(QMainWindow):
             self._dot_style = color
             self.status_dot.setStyleSheet(f"background: {color}; border-radius: 5px;")
 
-    def update_model_chip_from_status(self, status: str) -> None:
-        lowered = status.lower()
-        model_name = self.settings.model_name
-        downloading = "download" in lowered and "modello" in lowered
-        loading = "modello" in lowered and (
-            "preparazione" in lowered or "caricamento" in lowered
-        )
-        if downloading:
-            text, color = f"Modello: {model_name} · download in corso…", ACCENT
-        elif loading:
-            text, color = f"Modello: {model_name} · caricamento…", ACCENT
-        else:
-            text, color = f"Modello: {model_name}", "#c4cbd9"
-        if getattr(self, "_chip_style", None) != (text, color):
-            self._chip_style = (text, color)
-            self.model_chip_label.setText(text)
-            self.model_dot.setStyleSheet(
-                f"background: {color}; border-radius: 5px;"
-            )
+    def update_model_chip_from_status(self, key: str) -> None:
+        if key == "progress.downloading_model":
+            self._chip_state = "downloading"
+        elif key in ("progress.preparing_model", "progress.loading_model"):
+            self._chip_state = "loading"
+        elif self._chip_state in ("downloading", "loading"):
+            self._chip_state = "idle"
+        self._render_chip()
 
     def show_error(self, message: str) -> None:
-        self.set_status("Errore", "error")
+        """Show an error raised by a worker (raw text, mapped to a known message)."""
+        self._show_error(self.friendly_error(message), message)
+
+    def show_error_key(self, key: str) -> None:
+        self._show_error(key, "")
+
+    def _show_error(self, key: str | None, raw: str) -> None:
+        self._error = (key, raw)
+        self.set_status("status.error", "error")
         self.progress_bar.setValue(0)
         self.success_banner.hide()
-        self.error_label.setText(self.friendly_error(message))
+        self._success = None
+        self.error_label.setText(self._error_text())
         self.error_banner.setObjectName("bannerError")
         self.error_banner.show()
         self.update_actions()
 
+    def _error_text(self) -> str:
+        key, raw = self._error or (None, "")
+        if key is not None:
+            return tr(key)
+        return raw.splitlines()[0] if raw else tr("error.generic")
+
     def hide_error_banner(self) -> None:
+        self._error = None
         self.error_banner.hide()
 
-    def friendly_error(self, message: str) -> str:
+    @staticmethod
+    def friendly_error(message: str) -> str | None:
+        """Map a worker's raw message to an i18n key; None keeps the raw text."""
         lowered = message.lower()
         if "no space" in lowered or "disk" in lowered:
-            return "Spazio su disco insufficiente. Libera spazio o scegli un’altra cartella di output."
+            return "error.disk"
         if "api key" in lowered:
-            return "Aggiungi la tua chiave API OpenAI in Impostazioni prima di tradurre."
+            return "error.api_key"
         if "cancelled" in lowered:
-            return "L’operazione in corso è stata annullata."
+            return "error.cancelled"
         if "model" in lowered and ("download" in lowered or "connection" in lowered):
-            return "Il modello Whisper non può essere scaricato. Controlla la connessione e riprova."
-        return message.splitlines()[0] if message else "Qualcosa è andato storto. Riprova."
+            return "error.model_download"
+        return None if message else "error.generic"
 
     # --- Actions -------------------------------------------------------------
     def update_actions(self) -> None:
@@ -1421,10 +1487,10 @@ class MainWindow(QMainWindow):
         it_words = len(it_text.split())
         en_words = len(en_text.split())
         segments = len(self.transcript_segments)
-        self.it_pane_count.setText(f"{it_words} parole")
-        self.en_pane_count.setText(f"{en_words} parole")
+        self.it_pane_count.setText(tr_n("work.words", it_words))
+        self.en_pane_count.setText(tr_n("work.words", en_words))
         if segments:
-            self.work_stats.setText("1 frase" if segments == 1 else f"{segments} frasi")
+            self.work_stats.setText(tr_n("work.sentences", segments))
         else:
             self.work_stats.setText("")
 
@@ -1498,7 +1564,7 @@ class MainWindow(QMainWindow):
             "en_docx": self.default_export_path("en.docx"),
         }
         default_path = default_map[kind]
-        path, _ = QFileDialog.getSaveFileName(self, "Salva file", str(default_path))
+        path, _ = QFileDialog.getSaveFileName(self, tr("dialog.save_file"), str(default_path))
         if not path:
             return
         try:
@@ -1518,15 +1584,16 @@ class MainWindow(QMainWindow):
             elif kind == "en_docx":
                 write_docx(target, "English translation", self.english_text.toPlainText())
             self._last_output_folder = target.parent
+            self._success = (target.name, str(target.parent))
             self.success_label.setText(
-                f"Lavoro completato: salvato “{target.name}” in {target.parent}"
+                tr("success.saved", name=target.name, folder=str(target.parent))
             )
             self.success_banner.setObjectName("bannerOk")
             self.success_banner.show()
             self.hide_error_banner()
-            self.set_status(f"Salvato {target.name}", "ok")
+            self.set_status("status.saved", "ok", {"name": target.name})
         except OSError:
-            self.show_error("Impossibile salvare il file. Controlla la cartella e riprova.")
+            self.show_error_key("error.save_failed")
 
     def open_output_folder(self) -> None:
         folder = self._last_output_folder

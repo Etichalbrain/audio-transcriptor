@@ -10,7 +10,7 @@ from audio_transcriptor.settings import AppSettings
 
 
 class WorkerSignals(QObject):
-    progress = Signal(str, int)
+    progress = Signal(str, int, object)
     transcribed = Signal(object)
     translated = Signal(object)
     error = Signal(str)
@@ -29,8 +29,8 @@ class BaseWorker(QRunnable):
     def is_cancelled(self) -> bool:
         return self._cancelled
 
-    def emit_progress(self, status: str, value: int) -> None:
-        self._emit(self.signals.progress, status, max(0, min(100, value)))
+    def emit_progress(self, key: str, value: int, params: dict | None = None) -> None:
+        self._emit(self.signals.progress, key, max(0, min(100, value)), params or {})
 
     def _emit(self, signal: Signal, *args) -> None:
         # The window can be closed while a worker thread is still running; by
