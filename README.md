@@ -125,7 +125,9 @@ pip install -r requirements.txt
 python -m audio_transcriptor
 ```
 
-Python 3.9 or newer. The Windows build runs on 3.12.
+Python 3.9 or newer runs from source, but 3.9 is end of life (October 2025), so prefer 3.11 or newer.
+The Windows build runs on 3.12; `build_macos.sh` prefers 3.13, 3.12 or 3.11 and only falls back to
+the system `python3` with a warning.
 
 Run the tests (no model download, no API key needed):
 
