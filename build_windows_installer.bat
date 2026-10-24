@@ -65,6 +65,9 @@ copy /Y PRIVACY.md "dist\AudioTranscriptor\PRIVACY.md" >nul
 copy /Y TERMS.md "dist\AudioTranscriptor\TERMS.md" >nul
 copy /Y THIRD_PARTY_NOTICES.md "dist\AudioTranscriptor\THIRD_PARTY_NOTICES.md" >nul
 copy /Y installer\LEGGIMI.txt "dist\AudioTranscriptor\LEGGIMI.txt" >nul
+copy /Y installer\README-INSTALL-en.txt "dist\AudioTranscriptor\README-INSTALL-en.txt" >nul
+copy /Y installer\README-INSTALL-de.txt "dist\AudioTranscriptor\README-INSTALL-de.txt" >nul
+copy /Y installer\README-INSTALL-fr.txt "dist\AudioTranscriptor\README-INSTALL-fr.txt" >nul
 if exist licenses xcopy /E /I /Y licenses "dist\AudioTranscriptor\licenses" >nul
 if not exist "dist\AudioTranscriptor\LICENSE.txt" (
   echo Build incompleta: manca LICENSE.txt nella cartella dell'app

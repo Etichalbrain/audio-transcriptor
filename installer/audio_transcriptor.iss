@@ -16,8 +16,6 @@ DefaultDirName={localappdata}\Programs\AudioTranscriptor
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 LicenseFile=..\LICENSE
-; Privacy and disclaimer note shown before the license page.
-InfoBeforeFile=LEGGIMI.txt
 ; Per-user install: no administrator rights required.
 SetupIconFile=..\assets\AudioTranscriptor.ico
 PrivilegesRequired=lowest
@@ -30,9 +28,16 @@ UninstallDisplayIcon={app}\{#MyAppExeName}
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
 
+; English comes first so it is the fallback. With ShowLanguageDialog at its
+; default (yes) Inno Setup preselects the language of the Windows UI and only
+; asks when that language is not available. Each language shows its own
+; privacy and disclaimer note (InfoBeforeFile) before the license page.
+; The .txt notices carry a UTF-8 BOM, which Inno Setup needs to read accents.
 [Languages]
-Name: "italian"; MessagesFile: "compiler:Languages\Italian.isl"
-Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "english"; MessagesFile: "compiler:Default.isl"; InfoBeforeFile: "README-INSTALL-en.txt"
+Name: "italian"; MessagesFile: "compiler:Languages\Italian.isl"; InfoBeforeFile: "LEGGIMI.txt"
+Name: "german"; MessagesFile: "compiler:Languages\German.isl"; InfoBeforeFile: "README-INSTALL-de.txt"
+Name: "french"; MessagesFile: "compiler:Languages\French.isl"; InfoBeforeFile: "README-INSTALL-fr.txt"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked

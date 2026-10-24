@@ -10,6 +10,14 @@ from audio_transcriptor.settings import TRANSLATION_MODES, WHISPER_MODELS
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# Installer language -> pre-install notice shown by that language.
+INSTALLER_NOTICES = {
+    "english": Path("README-INSTALL-en.txt"),
+    "italian": Path("LEGGIMI.txt"),
+    "german": Path("README-INSTALL-de.txt"),
+    "french": Path("README-INSTALL-fr.txt"),
+}
+
 
 def read(relative: str) -> str:
     return (ROOT / relative).read_text(encoding="utf-8")
@@ -129,8 +137,33 @@ class VersionConsistencyTests(unittest.TestCase):
         for promise in ("sicurezza", "assistenza", "indenne"):
             self.assertIn(promise, installer_note, f"LEGGIMI.txt no longer mentions {promise}")
 
+        translated = {
+            "installer/README-INSTALL-en.txt": ("no guarantee of security", "support or updates", "hold the author harmless"),
+            "installer/README-INSTALL-de.txt": ("keine sicherheitsgarantie", "support oder updates", "stellen den autor frei"),
+            "installer/README-INSTALL-fr.txt": ("aucune garantie de sécurité", "assistance ou de mises à jour", "garantissez l'auteur"),
+        }
+        for name, phrases in translated.items():
+            note = read(name).lower()
+            for phrase in phrases:
+                self.assertIn(phrase, note, f"{name} no longer mentions {phrase!r}")
+
         self.assertIn("no obligation of support", read("README.md").lower())
         self.assertIn("TERMS.md", read("audio_transcriptor/app.py"))
+
+    def test_installer_notices_exist_and_every_build_ships_them(self) -> None:
+        installer = read("installer/audio_transcriptor.iss")
+        self.assertRegex(installer, r'(?m)^Name: "english";.*Default\.isl')
+        self.assertLess(installer.index('Name: "english"'), installer.index('Name: "italian"'))
+        for language, note in INSTALLER_NOTICES.items():
+            self.assertTrue((ROOT / "installer" / note.name).is_file(), f"missing installer/{note.name}")
+            raw = (ROOT / "installer" / note.name).read_bytes()
+            if not raw.isascii():
+                self.assertTrue(raw.startswith(b"\xef\xbb\xbf"), f"{note.name} needs a UTF-8 BOM for Inno Setup")
+            self.assertIn(f"Languages\\{language.capitalize()}.isl" if language != "english" else "Default.isl", installer)
+        for build in (".github/workflows/build-windows.yml", "build_windows_installer.bat"):
+            content = read(build)
+            for note in INSTALLER_NOTICES.values():
+                self.assertIn(note.name, content, f"{build} does not ship {note.name}")
 
     def test_every_build_ships_the_legal_files(self) -> None:
         for build in (
@@ -146,7 +179,12 @@ class VersionConsistencyTests(unittest.TestCase):
     def test_installer_and_readme_mention_the_license(self) -> None:
         installer = read("installer/audio_transcriptor.iss")
         self.assertIn(r"LicenseFile=..\LICENSE", installer)
-        self.assertIn("InfoBeforeFile=LEGGIMI.txt", installer)
+        self.assertNotIn("InfoBeforeFile=", installer, "InfoBeforeFile must be set per language")
+        for language, note in INSTALLER_NOTICES.items():
+            self.assertRegex(
+                installer,
+                rf'(?m)^Name: "{language}";.*InfoBeforeFile: "{re.escape(note.name)}"',
+            )
         self.assertIn("Commons Clause", read("README.md"))
         self.assertIn("Commons Clause", read("audio_transcriptor/app.py"))
 

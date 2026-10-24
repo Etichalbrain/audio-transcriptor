@@ -3,10 +3,36 @@ set -eu
 
 cd "$(dirname "$0")"
 
-# Recreate the venv if it is missing or was moved from another folder
-# (a moved venv keeps stale absolute paths in its scripts).
+# Pick the newest supported Python. Apple's own python3 is often 3.9, which is
+# end of life since October 2025, so prefer 3.13, 3.12 or 3.11 when installed.
+BASE_PYTHON=""
+for candidate in python3.13 python3.12 python3.11; do
+  if command -v "$candidate" >/dev/null 2>&1; then
+    BASE_PYTHON="$candidate"
+    break
+  fi
+done
+if [ -z "$BASE_PYTHON" ]; then
+  BASE_PYTHON=python3
+  echo "WARNING: python3.13, python3.12 and python3.11 were not found; falling back to $(command -v python3 || echo python3)." >&2
+  echo "WARNING: older Python versions (3.9 is end of life) may work but are not recommended; install a newer Python, for example with Homebrew." >&2
+fi
+WANTED_VERSION=$("$BASE_PYTHON" -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+
+# Recreate the venv if it is missing, was moved from another folder (a moved
+# venv keeps stale absolute paths in its scripts) or was created with a
+# different Python minor version than the one chosen above.
+if [ -x .venv/bin/python ]; then
+  CURRENT_VERSION=$(.venv/bin/python -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null || echo unknown)
+  if [ "$CURRENT_VERSION" != "$WANTED_VERSION" ]; then
+    echo "The existing .venv uses Python $CURRENT_VERSION but $WANTED_VERSION was selected; recreating .venv."
+    rm -rf .venv
+  fi
+fi
 if [ ! -x .venv/bin/python ]; then
-  python3 -m venv .venv
+  rm -rf .venv
+  echo "Creating .venv with Python $WANTED_VERSION ($BASE_PYTHON)."
+  "$BASE_PYTHON" -m venv .venv
 fi
 
 # Call the venv interpreter by path instead of activating it: on macOS there is

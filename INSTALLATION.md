@@ -41,7 +41,10 @@ example with `Get-FileHash AudioTranscriptorSetup-1.0.1.exe -Algorithm SHA256` i
 The installer is not code-signed, so Windows SmartScreen shows "Windows protected your PC";
 choose "More info" → "Run anyway".
 
-The setup shows a short privacy note (`installer/LEGGIMI.txt`), then the license, which must
+The setup is available in English, Italian, German and French (it follows the Windows display
+language and falls back to English). It shows a short privacy note in that language
+(`installer/README-INSTALL-en.txt`, `installer/LEGGIMI.txt` for Italian, `installer/README-INSTALL-de.txt`,
+`installer/README-INSTALL-fr.txt`), then the license, which must
 be accepted. The installed folder keeps `LICENSE.txt`, `LICENSE-SUPPLEMENT.md`,
 `NOTICE`, `PRIVACY.md`, `TERMS.md`,
 `THIRD_PARTY_NOTICES.md` and `licenses/` next to the executable, so the notices survive a copy.
@@ -92,6 +95,11 @@ python -m venv .venv
 pip install -r requirements.txt
 python -m audio_transcriptor
 ```
+
+Python 3.9 or newer still runs from source, but 3.9 is end of life (October 2025), so 3.11 or newer
+is recommended. The macOS build script (`build_macos.sh`) prefers `python3.13`, `python3.12` or
+`python3.11` and only falls back to the system `python3` with a warning; it recreates an existing
+`.venv` that was made with a different Python minor version. The Windows build runs on 3.12.
 
 ## Run the tests
 

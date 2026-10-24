@@ -52,9 +52,9 @@ jobs:
           $appDir = "dist/AudioTranscriptor"
           Copy-Item "LICENSE" "$appDir/LICENSE.txt" -Force
           Copy-Item "LICENSE-SUPPLEMENT.md" "$appDir/LICENSE-SUPPLEMENT.md" -Force
-          Copy-Item "NOTICE", "PRIVACY.md", "TERMS.md", "THIRD_PARTY_NOTICES.md", "installer/LEGGIMI.txt" $appDir -Force
+          Copy-Item "NOTICE", "PRIVACY.md", "TERMS.md", "THIRD_PARTY_NOTICES.md", "installer/LEGGIMI.txt", "installer/README-INSTALL-en.txt", "installer/README-INSTALL-de.txt", "installer/README-INSTALL-fr.txt" $appDir -Force
           Copy-Item "licenses" "$appDir/licenses" -Recurse -Force
-          $required = @("LICENSE.txt", "LICENSE-SUPPLEMENT.md", "NOTICE", "PRIVACY.md", "TERMS.md", "THIRD_PARTY_NOTICES.md", "LEGGIMI.txt", "licenses/LGPL-3.0.txt")
+          $required = @("LICENSE.txt", "LICENSE-SUPPLEMENT.md", "NOTICE", "PRIVACY.md", "TERMS.md", "THIRD_PARTY_NOTICES.md", "LEGGIMI.txt", "README-INSTALL-en.txt", "README-INSTALL-de.txt", "README-INSTALL-fr.txt", "licenses/LGPL-3.0.txt")
           foreach ($file in $required) {
             if (-not (Test-Path (Join-Path $appDir $file))) { throw "Missing $file in the app folder" }
           }

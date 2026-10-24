@@ -1,4 +1,4 @@
-AudioTranscriptor — cosa sapere prima di usarlo
+﻿AudioTranscriptor — cosa sapere prima di usarlo
 ================================================
 
 Licenza Apache License 2.0 + Commons Clause License Condition v1.0:
