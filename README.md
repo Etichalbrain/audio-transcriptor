@@ -27,10 +27,12 @@ the app works offline apart from the two things listed in [Privacy](#privacy).
 ## Download
 
 Release preparation status: the macOS Apple silicon package has been built and
-locally tried. The Windows filenames below describe the intended release
-artifacts; this renamed version still needs a Windows build and smoke test.
-Use <https://aversa.design> for official download information; do not assume
-that a release is available until it is actually published.
+locally tried. The Windows installer and portable zip are built and self-tested
+by the GitHub Actions workflow (packaging, legal files, self-test that runs a
+real transcription); the Windows interface itself has not yet been run by hand
+on a Windows machine. Use <https://aversa.design> for official download
+information; no release has been published yet, so do not assume the files
+below are downloadable.
 
 | File | What it is | Use it when |
 | --- | --- | --- |

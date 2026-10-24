@@ -1,9 +1,11 @@
 # Installation and Build Instructions
 
 Release status: the current macOS Apple silicon bundle has been built locally.
-The renamed Windows release still needs its build and smoke test. Instructions
-below describe the intended published artifacts, not a claim that all downloads
-are already available.
+The Windows installer and portable zip are built and self-tested by the GitHub
+Actions workflow, but the Windows interface has not yet been run by hand on a
+Windows machine, and no release has been published. Instructions below describe
+the intended published artifacts, not a claim that all downloads are already
+available.
 
 ## License before installing or distributing
 

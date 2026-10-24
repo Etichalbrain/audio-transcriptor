@@ -100,10 +100,11 @@ transcription progress reporting has been corrected as described below.
   separate permission; value-added commercial integrations may be permitted.
   Third-party licenses remain separate. AI-output and responsibility disclaimers
   are retained.
-- Windows: intended per-user Inno Setup installer (no administrator rights) and
-  portable zip via GitHub Actions from the release tag. This renamed version
-  still needs a Windows build and smoke test. The artifacts are unsigned;
-  SmartScreen may warn on first launch.
+- Windows: per-user Inno Setup installer (no administrator rights) and portable
+  zip, built by the GitHub Actions workflow, which also runs the packaged
+  self-test with a real transcription. The Windows interface has not yet been
+  run by hand on a Windows machine, and no release has been published. The
+  artifacts are unsigned; SmartScreen may warn on first launch.
 - macOS: ad-hoc signed `.app` and `AudioTranscriptor-<version>-arm64.dmg` for
   Apple silicon.
 - `SHA256SUMS.txt` is published with every release.
