@@ -13,6 +13,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtWidgets import QApplication, QDialog  # noqa: E402
 
 from audio_transcriptor import app as app_module, i18n  # noqa: E402
+from audio_transcriptor.ui import main_window as main_window_module  # noqa: E402
 from audio_transcriptor.models import TranscriptSegment  # noqa: E402
 from audio_transcriptor.settings import AppSettings, SettingsStore  # noqa: E402
 
@@ -86,7 +87,7 @@ class UiStateTests(unittest.TestCase):
 
     def test_translation_without_key_stops_before_sending(self) -> None:
         self.window.italian_text.setPlainText("ciao")
-        with patch.object(app_module, "TranslationWorker") as worker:
+        with patch.object(main_window_module, "TranslationWorker") as worker:
             self.window.start_translation()
         worker.assert_not_called()
         self.assertIn("chiave API", self.window.error_label.text())
@@ -96,7 +97,7 @@ class UiStateTests(unittest.TestCase):
         self.window.italian_text.setPlainText("ciao")
         with patch.object(
             app_module.TranslationConfirmDialog, "exec", return_value=QDialog.DialogCode.Rejected
-        ), patch.object(app_module, "TranslationWorker") as worker:
+        ), patch.object(main_window_module, "TranslationWorker") as worker:
             self.window.start_translation()
         worker.assert_not_called()
 
@@ -107,7 +108,7 @@ class UiStateTests(unittest.TestCase):
             app_module.TranslationConfirmDialog, "exec", return_value=QDialog.DialogCode.Accepted
         ), patch.object(
             app_module.TranslationConfirmDialog, "dont_ask_again", return_value=True
-        ), patch.object(app_module, "TranslationWorker"), patch.object(
+        ), patch.object(main_window_module, "TranslationWorker"), patch.object(
             self.window.thread_pool, "start"
         ):
             self.window.start_translation()

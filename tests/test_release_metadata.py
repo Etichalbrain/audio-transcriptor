@@ -23,6 +23,17 @@ def read(relative: str) -> str:
     return (ROOT / relative).read_text(encoding="utf-8")
 
 
+# The app is split across the entry point and the audio_transcriptor/ui package.
+APP_SOURCE_FILES = ("audio_transcriptor/app.py", *sorted(
+    path.relative_to(ROOT).as_posix() for path in (ROOT / "audio_transcriptor" / "ui").glob("*.py")
+))
+
+
+def read_app_sources() -> str:
+    """Text of the entry point plus every UI module, where the UI strings now live."""
+    return "\n".join(read(name) for name in APP_SOURCE_FILES)
+
+
 class VersionConsistencyTests(unittest.TestCase):
     def test_installer_uses_package_version(self) -> None:
         match = re.search(r'#define MyAppVersion "([^"]+)"', read("installer/audio_transcriptor.iss"))
@@ -83,13 +94,16 @@ class VersionConsistencyTests(unittest.TestCase):
     def test_license_summaries_do_not_claim_noncommercial_only(self) -> None:
         for name in (
             "README.md", "LICENSE-SUPPLEMENT.md", "NOTICE", "TERMS.md",
-            "audio_transcriptor/app.py", "installer/LEGGIMI.txt",
+            "installer/LEGGIMI.txt",
             "installer/windows_version_info.txt", ".github/workflows/build-windows.yml",
             "docs/cover.html",
         ):
             content = read(name)
             self.assertNotIn("PolyForm", content, name)
             self.assertIn("Commons Clause", content, name)
+        app_sources = read_app_sources()
+        self.assertNotIn("PolyForm", app_sources)
+        self.assertIn("Commons Clause", app_sources)
         self.assertIn("source-available", read("README.md"))
         self.assertIn("Apache 2.0 + Commons Clause", read("installer/windows_version_info.txt"))
 
@@ -148,7 +162,7 @@ class VersionConsistencyTests(unittest.TestCase):
                 self.assertIn(phrase, note, f"{name} no longer mentions {phrase!r}")
 
         self.assertIn("no obligation of support", read("README.md").lower())
-        self.assertIn("TERMS.md", read("audio_transcriptor/app.py"))
+        self.assertIn("TERMS.md", read_app_sources())
 
     def test_installer_notices_exist_and_every_build_ships_them(self) -> None:
         installer = read("installer/audio_transcriptor.iss")
@@ -186,10 +200,10 @@ class VersionConsistencyTests(unittest.TestCase):
                 rf'(?m)^Name: "{language}";.*InfoBeforeFile: "{re.escape(note.name)}"',
             )
         self.assertIn("Commons Clause", read("README.md"))
-        self.assertIn("Commons Clause", read("audio_transcriptor/app.py"))
+        self.assertIn("Commons Clause", read_app_sources())
 
     def test_app_credits_the_author_and_explains_privacy(self) -> None:
-        content = read("audio_transcriptor/app.py")
+        content = read_app_sources()
         self.assertIn("class AboutDialog", content)
         self.assertIn("Antonio Aversa", content)
         self.assertIn("PRIVACY.md", content)
@@ -202,7 +216,7 @@ class VersionConsistencyTests(unittest.TestCase):
         # no literal of either one.
         retired = ("Transcript " + "Studio", "yak" + "kyo")
         for name in (
-            "audio_transcriptor/app.py",
+            *APP_SOURCE_FILES,
             "README.md",
             "NOTICE",
             "TERMS.md",
