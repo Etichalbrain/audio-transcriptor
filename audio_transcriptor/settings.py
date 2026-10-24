@@ -25,6 +25,7 @@ class AppSettings:
     openai_model: str = "gpt-5"
     translation_mode: str = "openai"
     theme: str = "light"
+    confirm_translation: bool = True
 
     def __post_init__(self) -> None:
         # Sanitise values that may come from an older settings file, so the app

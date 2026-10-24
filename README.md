@@ -66,6 +66,11 @@ approval steps vary by OS version.
 - **English translation** through the OpenAI API, in batches of 20 segments, with a per-segment
   fallback when a batch answer cannot be matched one-to-one, so translations never land on the
   wrong subtitle.
+- **Confirmation before anything leaves the computer**: before translating, the app shows how
+  many sentences and characters will be sent and to which model. It can be turned off in
+  Settings.
+- **Measured progress**: minutes of audio processed and sentences translated, no invented
+  percentages.
 - **Six exports**: Italian/English × TXT, SRT, DOCX.
 - **Light and dark themes**, background processing, drag and drop.
 
@@ -153,6 +158,12 @@ Pushing a tag `vX.Y.Z` runs the tests, builds the installer and the portable zip
 - [CHANGELOG.md](CHANGELOG.md) — what is in this release
 
 ## FAQ
+
+**There are other Whisper apps. Why this one?** Several desktop apps already run Whisper
+locally. AudioTranscriptor is narrower on purpose: it is built for one workflow, Italian
+interviews to an Italian transcript and English subtitles, and its subtitle export keeps cues in
+sync after you edit the text. If you need many languages or speaker detection, another tool will
+serve you better today.
 
 **Is it really free?** Personal and professional internal use, including paid
 work using the app, is allowed subject to Apache 2.0 + Commons Clause, without

@@ -115,7 +115,7 @@ class TranslateWithClientTests(unittest.TestCase):
         self.assertEqual([s.index for s in result.segments], [s.index for s in segments])
         self.assertEqual([s.start for s in result.segments], [s.start for s in segments])
         self.assertEqual(result.text.splitlines()[0], "EN 1")
-        self.assertEqual(progress[-1], ("Translation complete", 100))
+        self.assertEqual(progress[-1], ("Traduzione completata", 100))
 
     def test_bad_batch_falls_back_to_one_request_per_segment(self) -> None:
         segments = make_segments(3)
@@ -150,7 +150,7 @@ class TranslateWithClientTests(unittest.TestCase):
         result, progress = self.run_translation(client, [])
         self.assertEqual(client.responses.calls, [])
         self.assertEqual(result.segments, [])
-        self.assertEqual(progress[-1], ("Translation complete", 100))
+        self.assertEqual(progress[-1], ("Traduzione completata", 100))
 
 
 class ModeTests(unittest.TestCase):

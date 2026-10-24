@@ -194,7 +194,7 @@ class CapabilityTests(unittest.TestCase):
     def test_default_model_is_offered_in_settings_ui(self) -> None:
         from audio_transcriptor import app  # noqa: F401  (imported for the constant only)
 
-        self.assertIn(("small", "small (fast, about 0.5 GB to download)"), app.MODEL_CHOICES)
+        self.assertIn(("small", "small (veloce, circa 0,5 GB da scaricare)"), app.MODEL_CHOICES)
         for value, _label in app.MODEL_CHOICES:
             self.assertIn(value, WHISPER_MODELS)
 

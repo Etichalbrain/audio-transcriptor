@@ -81,6 +81,17 @@ def parse_batch_translation(raw: str, expected: int) -> list[str] | None:
     return results
 
 
+def _fmt_clock(seconds: float) -> str:
+    minutes, secs = divmod(int(seconds), 60)
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}:{minutes:02d}:{secs:02d}" if hours else f"{minutes}:{secs:02d}"
+
+
+def probe_duration(media_path: Path) -> float | None:
+    """Public alias used by the UI to show the duration before transcribing."""
+    return _probe_duration(media_path)
+
+
 def _probe_duration(media_path: Path) -> float | None:
     """Best-effort media duration in seconds, used for smooth progress reporting."""
     try:
@@ -104,12 +115,12 @@ class TranscriptionService:
         progress_callback,
         cancel_checker,
     ) -> TranscriptionResult:
-        progress_callback("Preparing Whisper model...", 3)
+        progress_callback("Preparazione del modello Whisper…", 3)
         if cancel_checker():
             raise RuntimeError("Processing cancelled.")
         model = self._load_model(model_name, progress_callback, cancel_checker)
 
-        progress_callback("Transcribing...", 15)
+        progress_callback("Trascrizione in corso…", 15)
         whisper_language = None if language == "auto" else language
         raw_segments, _info = model.transcribe(
             str(media_path),
@@ -141,11 +152,17 @@ class TranscriptionService:
             if total_duration:
                 fraction = min(1.0, float(segment.end) / total_duration)
                 value = 15 + int(80 * fraction)
+                # Measured, not estimated: minutes of audio already processed.
+                status = (
+                    f"Trascrizione in corso: {_fmt_clock(segment.end)} "
+                    f"di {_fmt_clock(total_duration)}"
+                )
             else:
                 value = 15 + index
-            progress_callback("Transcribing...", min(98, value))
+                status = "Trascrizione in corso…"
+            progress_callback(status, min(98, value))
 
-        progress_callback("Transcription complete", 100)
+        progress_callback("Trascrizione completata", 100)
         return TranscriptionResult(text="\n".join(text_parts), segments=segments)
 
     def _load_model(self, model_name: str, progress_callback, cancel_checker):
@@ -158,7 +175,7 @@ class TranscriptionService:
         from faster_whisper import WhisperModel
 
         def make_model(location: str):
-            progress_callback("Loading Whisper model...", 8)
+            progress_callback("Caricamento del modello Whisper…", 8)
             return WhisperModel(location, device="auto", compute_type="auto")
 
         if Path(model_name).exists():
@@ -172,7 +189,7 @@ class TranscriptionService:
         if download_model is None:
             return make_model(model_name)
 
-        progress_callback("Preparing Whisper model (the first run downloads it)...", 4)
+        progress_callback("Download del modello Whisper (solo al primo utilizzo)…", 4)
         outcome: dict[str, object] = {}
 
         def fetch() -> None:
@@ -258,7 +275,7 @@ class TranslationService:
         translated_segments: list[TranscriptSegment] = []
         total = max(len(segments), 1)
         done = 0
-        progress_callback("Translating...", 5)
+        progress_callback("Traduzione in corso…", 5)
 
         for start in range(0, len(segments), TRANSLATION_BATCH_SIZE):
             if cancel_checker():
@@ -281,9 +298,12 @@ class TranslationService:
                     )
                 )
             done += len(batch)
-            progress_callback("Translating...", 5 + int((done / total) * 90))
+            progress_callback(
+                f"Traduzione in corso: {done} di {len(segments)} frasi",
+                5 + int((done / total) * 90),
+            )
 
-        progress_callback("Translation complete", 100)
+        progress_callback("Traduzione completata", 100)
         return TranslationResult(
             text="\n".join(segment.translated_text for segment in translated_segments),
             segments=translated_segments,
