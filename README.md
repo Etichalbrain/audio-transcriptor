@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://aversa.design"><img alt="Download" src="https://img.shields.io/badge/download-audio_transcriptor-2563eb"></a>
+  <a href="https://aversa.design/audio-transcriptor/"><img alt="Download" src="https://img.shields.io/badge/download-audio_transcriptor-2563eb"></a>
   <a href="LICENSE"><img alt="License: Apache 2.0 + Commons Clause (source-available)" src="https://img.shields.io/badge/license-Apache_2.0_%2B_Commons_Clause-blue"></a>
   <img alt="Platforms" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-0ea5e9">
   <img alt="No telemetry" src="https://img.shields.io/badge/telemetry-none-8b5cf6">
@@ -30,7 +30,7 @@ Release preparation status: the macOS Apple silicon package has been built and
 locally tried. The Windows installer and portable zip are built and self-tested
 by the GitHub Actions workflow (packaging, legal files, self-test that runs a
 real transcription); the Windows interface itself has not yet been run by hand
-on a Windows machine. Use <https://aversa.design> for official download
+on a Windows machine. Use <https://aversa.design/audio-transcriptor/> for official download
 information; no release has been published yet, so do not assume the files
 below are downloadable.
 
