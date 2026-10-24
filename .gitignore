@@ -1,0 +1,29 @@
+# Python / build artifacts
+.venv/
+build/
+dist/
+.pyinstaller-cache/
+.pycache/
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+
+# Inno Setup output
+installer/Output/
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Internal review, not part of the public repo
+docs/launch-review.md
+
+# Local UI render previews
+.ui_preview/
+
+# Design mockup bundle (kept locally, not published)
+New interface static/
+
+# Internal product notes (not for the public repo)
+PRODUCT.md

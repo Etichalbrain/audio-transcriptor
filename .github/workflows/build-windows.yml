@@ -1,0 +1,161 @@
+name: build-windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt pyinstaller
+
+      - name: Run tests
+        run: python -m unittest discover -s tests -t . -v
+
+      - name: Check tag matches app version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $content = Get-Content "audio_transcriptor/__init__.py" -Raw
+          $version = [regex]::Match($content, '"([0-9]+\.[0-9]+\.[0-9]+)"').Groups[1].Value
+          if ("v$version" -ne "${{ github.ref_name }}") {
+            throw "Tag ${{ github.ref_name }} does not match app version $version"
+          }
+          Write-Host "Version $version matches tag"
+
+      - name: Build executable (onedir)
+        run: python -m PyInstaller --noconfirm --clean AudioTranscriptorWindows.spec
+
+      - name: Ship the legal files with the app
+        shell: pwsh
+        run: |
+          $appDir = "dist/AudioTranscriptor"
+          Copy-Item "LICENSE" "$appDir/LICENSE.txt" -Force
+          Copy-Item "LICENSE-SUPPLEMENT.md" "$appDir/LICENSE-SUPPLEMENT.md" -Force
+          Copy-Item "NOTICE", "PRIVACY.md", "TERMS.md", "THIRD_PARTY_NOTICES.md", "installer/LEGGIMI.txt" $appDir -Force
+          Copy-Item "licenses" "$appDir/licenses" -Recurse -Force
+          $required = @("LICENSE.txt", "LICENSE-SUPPLEMENT.md", "NOTICE", "PRIVACY.md", "TERMS.md", "THIRD_PARTY_NOTICES.md", "LEGGIMI.txt", "licenses/LGPL-3.0.txt")
+          foreach ($file in $required) {
+            if (-not (Test-Path (Join-Path $appDir $file))) { throw "Missing $file in the app folder" }
+          }
+          Write-Host "Legal files shipped with the app"
+
+      - name: Verify build output
+        shell: pwsh
+        run: |
+          $exe = "dist/AudioTranscriptor/AudioTranscriptor.exe"
+          if (-not (Test-Path $exe)) { throw "Missing $exe" }
+          if (-not (Test-Path "dist/AudioTranscriptor/LICENSE.txt")) { throw "Missing LICENSE.txt" }
+          if (-not (Test-Path "dist/AudioTranscriptor/THIRD_PARTY_NOTICES.md")) { throw "Missing THIRD_PARTY_NOTICES.md" }
+          if (-not (Test-Path "dist/AudioTranscriptor/_internal/faster_whisper/assets/silero_vad_v6.onnx")) { throw "Missing silero VAD asset" }
+          if (-not (Test-Path "dist/AudioTranscriptor/_internal/docx/templates/default.docx")) { throw "Missing python-docx template" }
+          Get-ChildItem "dist/AudioTranscriptor" | Select-Object -First 10 Name
+
+      - name: Self-test the packaged app
+        shell: pwsh
+        run: |
+          $exe = "dist/AudioTranscriptor/AudioTranscriptor.exe"
+          $report = "dist/AudioTranscriptor/self-test.txt"
+          if (Test-Path $report) { Remove-Item $report }
+          $process = Start-Process -FilePath $exe -ArgumentList "--self-test-engine" -Wait -PassThru
+          if (-not (Test-Path $report)) { throw "Self-test wrote no report" }
+          Get-Content $report
+          if ($process.ExitCode -ne 0) { throw "Self-test failed with exit code $($process.ExitCode)" }
+          if (-not (Select-String -Path $report -Pattern "0 failed" -Quiet)) { throw "Self-test reported failures" }
+          Remove-Item $report
+          Write-Host "Packaged app passed the self-test and ran the transcription engine"
+
+      - name: Locate Inno Setup compiler
+        shell: pwsh
+        run: |
+          $candidates = @(
+            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+            "C:\Program Files\Inno Setup 6\ISCC.exe"
+          )
+          $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) { throw "ISCC.exe not found" }
+          "ISCC=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Using $iscc"
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          & "$env:ISCC" "installer\audio_transcriptor.iss"
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with $LASTEXITCODE" }
+
+      - name: Package portable folder
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "dist/AudioTranscriptor" -DestinationPath "installer/Output/AudioTranscriptor-Portable.zip" -CompressionLevel Optimal
+          Get-Item "installer/Output/AudioTranscriptor-Portable.zip" | Select-Object Name, Length
+
+      - name: Write checksums
+        shell: pwsh
+        run: |
+          $artifacts = @(Get-ChildItem "installer/Output" -File | Where-Object { $_.Extension -in ".exe", ".zip" })
+          if ($artifacts.Count -lt 2) { throw "Expected the installer and the portable zip, found $($artifacts.Count)" }
+          $lines = @(
+            foreach ($file in $artifacts) {
+              $hash = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLower()
+              "$hash  $($file.Name)"
+            }
+          )
+          # One LF-terminated line per file so `sha256sum -c` and `shasum -c` work.
+          Set-Content -Path "installer/Output/SHA256SUMS.txt" -Value (($lines -join "`n") + "`n") -NoNewline -Encoding ascii
+          Get-Content "installer/Output/SHA256SUMS.txt"
+          if ((Get-Item "installer/Output/SHA256SUMS.txt").Length -lt 150) { throw "SHA256SUMS.txt looks truncated" }
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AudioTranscriptor-Windows
+          path: |
+            installer/Output/*.exe
+            installer/Output/*.zip
+            installer/Output/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: AudioTranscriptor ${{ github.ref_name }}
+          body: |
+            Desktop app that turns Italian audio and video into an Italian transcript,
+            an English translation and TXT/SRT/DOCX exports. Transcription runs locally;
+            only the optional translation sends text to the OpenAI API.
+
+            **Verify your download** against `SHA256SUMS.txt`. The installer is not
+            code-signed: on first launch choose *More info → Run anyway*.
+
+            License: Apache License 2.0 + Commons Clause v1.0 (source-available,
+            not open source). Personal and professional internal use is permitted;
+            selling products or services whose value derives entirely or substantially
+            from the software requires separate permission. Not all commercial
+            integrations are restricted; no automatic royalty applies. See `LICENSE`,
+            `LICENSE-SUPPLEMENT.md`, `NOTICE` and aversa.design.
+          files: |
+            installer/Output/*.exe
+            installer/Output/*.zip
+            installer/Output/SHA256SUMS.txt
+          fail_on_unmatched_files: true

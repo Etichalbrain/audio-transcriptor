@@ -1,0 +1,73 @@
+AudioTranscriptor — cosa sapere prima di usarlo
+================================================
+
+Licenza Apache License 2.0 + Commons Clause License Condition v1.0:
+codice disponibile (source-available), NON open source e non semplice Apache-2.0.
+LICENSE.txt contiene la Commons Clause e il testo Apache completo e inalterato.
+LICENSE-SUPPLEMENT.md è una guida esplicativa, non condizioni aggiuntive o
+prevalenti. Crediti: Antonio Aversa / aversa.design. Conserva le attribuzioni
+e gli avvisi richiesti dalla licenza; vedi NOTICE.
+
+L'uso personale e professionale interno, anche per lavori retribuiti svolti con
+l'app, è consentito nel rispetto della licenza, senza royalty automatica.
+La licenza non concede il diritto di "Sell": fornire a terzi, dietro pagamento
+o altro corrispettivo, un prodotto o servizio il cui valore derivi interamente
+o sostanzialmente dalle funzionalità del software. Sono compresi i compensi per
+hosting e consulenza/assistenza relativi al software, sempre soggetti allo
+stesso criterio del valore sostanziale. Per tali offerte serve un permesso
+separato dei titolari dei diritti interessati: contatta https://aversa.design.
+Non è un divieto generale di ogni integrazione commerciale: integrazioni con
+valore aggiunto possono essere consentite. Modifica e ridistribuzione restano
+soggette alle condizioni della licenza, non sono vietate in assoluto.
+I componenti di terze parti mantengono le proprie licenze. Questa sintesi non
+è consulenza legale né una certificazione di conformità.
+
+I TUOI FILE RESTANO SU QUESTO COMPUTER
+- L'audio e il video non vengono mai caricati su internet: la trascrizione
+  avviene in locale con Whisper.
+- Il primo utilizzo di un modello scarica il modello da Hugging Face (circa
+  0,5 GB per "small"); non viene inviato nulla dei tuoi file.
+- La traduzione è l'unica funzione che esce dal computer: quando premi
+  "Traduci in inglese", il testo della trascrizione viene inviato all'API di
+  OpenAI con la tua chiave. Se non vuoi, non usare la traduzione.
+- Nessuna telemetria, nessun account, nessuna statistica d'uso.
+
+DATI SUL DISCO
+- Impostazioni e chiave OpenAI: %LOCALAPPDATA%\AudioTranscriptor\settings.json
+- Modelli scaricati: %USERPROFILE%\.cache\huggingface\hub
+- Esportazioni: la cartella che scegli tu.
+Per rimuovere tutto: disinstalla l'app e cancella le due cartelle sopra.
+
+RESPONSABILITÀ
+La trascrizione automatica può sbagliare parole, nomi e numeri: controlla
+sempre il risultato prima di usarlo. Se registri una conversazione, sei tu
+responsabile del consenso delle persone coinvolte e del trattamento dei dati.
+
+Nessuna garanzia di sicurezza: il programma non è certificato né verificato e
+non è garantito che sia privo di difetti o vulnerabilità. La chiave OpenAI è
+salvata in chiaro nel file delle impostazioni. Proteggere il computer e
+l'account (aggiornamenti, antivirus, accesso fisico) spetta a te.
+
+Nessun obbligo di assistenza o aggiornamenti: il progetto è gratuito e non è
+un servizio. Non c'è obbligo di rispondere, correggere errori, aggiornare il
+programma o mantenerlo compatibile con versioni future di Windows, macOS o
+delle librerie. Le segnalazioni sono ben accette, ma senza tempi garantiti.
+
+Uso a tuo rischio, nei limiti di legge: il programma è fornito "così com'è" e
+non è destinato a usi ad alto rischio (medico, legale, sicurezza) né a
+sostituire una verifica professionale. Conservare i backup di trascrizioni ed
+esportazioni spetta a te. Se un terzo avanza pretese per come hai usato il
+programma, per esempio per una registrazione senza consenso, ne rispondi tu e
+tieni indenne l'autore. Restano fermi i diritti inderogabili di legge e la
+responsabilità per dolo o colpa grave. Testo completo in TERMS.md.
+
+Documenti completi nella cartella dell'applicazione:
+  LICENSE.txt            Apache 2.0 + Commons Clause v1.0 (testi completi)
+  LICENSE-SUPPLEMENT.md  guida esplicativa alla licenza
+  NOTICE                 come citare l'autore
+  PRIVACY.md             quali dati escono dal computer e quando
+  TERMS.md               esonero di responsabilità e condizioni d'uso
+  THIRD_PARTY_NOTICES.md licenze dei componenti di terze parti (Qt, Whisper...)
+  licenses\              testi completi di LGPL-3.0, GPL-3.0, Apache-2.0
+
+Progetto: https://aversa.design
