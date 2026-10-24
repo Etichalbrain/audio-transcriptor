@@ -5,6 +5,19 @@ All notable changes to AudioTranscriptor. Versions follow the app version in
 
 ## Unreleased
 
+### Listen while correcting
+
+- A player above the transcript: play/pause, 5 seconds back and forward, a
+  position slider and "Play from cursor", which starts at the sentence under
+  the text cursor. The sentence being spoken is highlighted in the Italian and
+  English text and scrolled into view while playing.
+- Keyboard first: Esc plays/pauses, Ctrl+J (Cmd+J on macOS) plays from the
+  cursor line, Ctrl+[ and Ctrl+] move 5 seconds.
+- Edits are respected: after merging, adding or deleting lines the timing
+  follows the same rule as the subtitle export, so playback and SRT agree.
+- Without an audio output device the app says so; transcription and export
+  are unaffected. Qt Multimedia is loaded only on the first play.
+
 ### Interface languages
 
 - The interface is available in **English, Italian, German and French**. On

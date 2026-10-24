@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import unittest
 
-from audio_transcriptor.alignment import align_lines_to_segments, edited_lines
+from audio_transcriptor.alignment import (
+    align_lines_to_segments,
+    edited_lines,
+    line_at_time,
+    line_time_spans,
+)
 from audio_transcriptor.models import TranscriptSegment
 
 
@@ -85,6 +90,41 @@ class AlignmentTests(unittest.TestCase):
         # sends all three lines there; weighting by text length would not.
         self.assertEqual(segments[0].text.split(), lines)
         self.assertEqual(segments[1].text, "")
+
+
+
+class LineTimeTests(unittest.TestCase):
+    def test_one_line_per_segment_uses_segment_times(self) -> None:
+        spans = line_time_spans("uno\ndue\ntre", make_segments())
+        self.assertEqual(spans, [(0.0, 1.0), (1.0, 2.0), (2.0, 3.0)])
+
+    def test_blank_lines_have_no_time(self) -> None:
+        spans = line_time_spans("uno\n\ndue\ntre", make_segments())
+        self.assertEqual(spans, [(0.0, 1.0), None, (1.0, 2.0), (2.0, 3.0)])
+
+    def test_merged_lines_stay_in_order(self) -> None:
+        spans = line_time_spans("uno due\ntre", make_segments())
+        starts = [span[0] for span in spans if span]
+        self.assertEqual(starts, sorted(starts))
+        self.assertEqual(len(spans), 2)
+
+    def test_matches_export_alignment(self) -> None:
+        text = "una riga molto lunga che copre quasi tutto\nfine"
+        segments = make_segments(4)
+        spans = line_time_spans(text, segments)
+        exported = make_segments(4)
+        align_lines_to_segments(text, exported)
+        for line, span in zip(text.splitlines(), spans):
+            owner = next(s for s in exported if line in s.text)
+            self.assertEqual(span, (owner.start, owner.end))
+
+    def test_line_at_time(self) -> None:
+        spans = [(0.0, 1.0), None, (1.0, 2.0), (2.0, 3.0)]
+        self.assertEqual(line_at_time(spans, 0.5), 0)
+        self.assertEqual(line_at_time(spans, 1.5), 2)
+        self.assertEqual(line_at_time(spans, 9.0), 3)
+        self.assertIsNone(line_at_time([(5.0, 6.0)], 1.0))
+        self.assertIsNone(line_at_time([], 1.0))
 
 
 if __name__ == "__main__":

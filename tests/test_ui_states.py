@@ -115,5 +115,85 @@ class UiStateTests(unittest.TestCase):
         self.assertFalse(self.window.settings_store.load().confirm_translation)
 
 
+
+class PlayerTests(unittest.TestCase):
+    """Player logic without real audio: seek_to is patched, nothing is played."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        media = Path(self._tmp.name) / "intervista.mp3"
+        media.write_bytes(b"not really audio")
+        with patch.object(SettingsStore, "load", return_value=AppSettings(ui_language="en")):
+            self.window = app_module.MainWindow()
+        self.addCleanup(self.window.close)
+        self.window.show()
+        self.window.set_selected_file(str(media))
+
+    def _transcribe(self, lines: list[str]) -> None:
+        self.window.transcript_segments = [
+            TranscriptSegment(i + 1, i * 10.0, i * 10.0 + 8.0, line) for i, line in enumerate(lines)
+        ]
+        self.window.italian_text.setPlainText("\n".join(lines))
+        self.window.update_actions()
+
+    def _put_cursor_on_line(self, line: int) -> None:
+        cursor = self.window.italian_text.textCursor()
+        block = self.window.italian_text.document().findBlockByNumber(line)
+        cursor.setPosition(block.position())
+        self.window.italian_text.setTextCursor(cursor)
+
+    def test_player_appears_only_with_timings(self) -> None:
+        self.assertFalse(self.window.player_bar.isVisible())
+        self._transcribe(["uno", "due"])
+        self.assertTrue(self.window.player_bar.isVisible())
+        self.window.clear_file()
+        self.assertFalse(self.window.player_bar.isVisible())
+
+    def test_play_from_cursor_starts_at_that_sentence(self) -> None:
+        self._transcribe(["uno", "due", "tre"])
+        self._put_cursor_on_line(2)
+        with patch.object(self.window, "seek_to") as seek:
+            self.window.play_from_cursor()
+        seek.assert_called_once_with(20.0, play=True)
+
+    def test_play_from_blank_line_uses_previous_sentence(self) -> None:
+        self._transcribe(["uno", "due", "tre"])
+        self.window.italian_text.setPlainText("uno\ndue\n\ntre")
+        self._put_cursor_on_line(2)
+        with patch.object(self.window, "seek_to") as seek:
+            self.window.play_from_cursor()
+        self.assertEqual(seek.call_args.args[0], 10.0)
+
+    def test_tick_highlights_the_spoken_line(self) -> None:
+        self._transcribe(["uno", "due", "tre"])
+        self.window._on_player_tick(12.0)
+        selections = self.window.italian_text.extraSelections()
+        self.assertEqual(len(selections), 1)
+        self.assertEqual(selections[0].cursor.block().text(), "due")
+        self.assertEqual(self.window.time_label.text().split(" / ")[0], "0:12")
+
+    def test_editing_text_moves_highlight_with_it(self) -> None:
+        self._transcribe(["uno", "due", "tre"])
+        self.window._on_player_tick(25.0)
+        self.window.italian_text.setPlainText("titolo aggiunto\nuno\ndue\ntre")
+        self.window._on_player_tick(25.0)
+        selections = self.window.italian_text.extraSelections()
+        line = selections[0].cursor.blockNumber()
+        self.assertGreaterEqual(line, 2)
+
+    def test_shortcuts_hint_is_translated(self) -> None:
+        self._transcribe(["uno"])
+        self.assertIn("play/pause", self.window.shortcut_hint.text())
+        self.window.settings.ui_language = "it"
+        self.window.apply_language()
+        self.window.retranslate_ui()
+        self.assertIn("riproduci/pausa", self.window.shortcut_hint.text())
+        self.assertEqual(self.window.from_cursor_button.text(), "Ascolta da qui")
+
+    def tearDown(self) -> None:
+        i18n.set_language("en")
+
+
 if __name__ == "__main__":
     unittest.main()

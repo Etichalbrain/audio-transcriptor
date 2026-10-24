@@ -21,6 +21,71 @@ def _segment_weights(segments: list[TranscriptSegment]) -> list[float]:
     return weights
 
 
+def _assign_lines(lines: list[str], segments: list[TranscriptSegment]) -> list[int]:
+    """Segment index for each non-empty line.
+
+    One line per segment maps exactly. Otherwise each line goes to the segment
+    whose share of the audio duration contains the middle of the line's share
+    of the text: the same rule the exports use, so playback and subtitles agree.
+    """
+    if len(lines) == len(segments):
+        return list(range(len(lines)))
+    weights = _segment_weights(segments)
+    total_weight = sum(weights) or float(len(segments))
+    boundaries: list[float] = []
+    running = 0.0
+    for weight in weights:
+        running += weight
+        boundaries.append(running / total_weight)
+
+    total_chars = sum(len(line) for line in lines) or 1
+    position = 0
+    assigned: list[int] = []
+    for line in lines:
+        center = (position + len(line) / 2) / total_chars
+        assigned.append(
+            next(
+                (index for index, edge in enumerate(boundaries) if center <= edge),
+                len(segments) - 1,
+            )
+        )
+        position += len(line)
+    return assigned
+
+
+def line_time_spans(
+    text: str, segments: list[TranscriptSegment]
+) -> list[tuple[float, float] | None]:
+    """Audio span for every line of the edited text, blank lines included (None).
+
+    Used by the player: the cursor's line tells where to start listening, and
+    the playback position tells which line to highlight.
+    """
+    raw_lines = text.splitlines()
+    filled = [index for index, line in enumerate(raw_lines) if line.strip()]
+    spans: list[tuple[float, float] | None] = [None] * len(raw_lines)
+    if not filled or not segments:
+        return spans
+    lines = [raw_lines[index].strip() for index in filled]
+    for line_index, segment_index in zip(filled, _assign_lines(lines, segments)):
+        segment = segments[segment_index]
+        spans[line_index] = (float(segment.start), float(segment.end))
+    return spans
+
+
+def line_at_time(spans: list[tuple[float, float] | None], seconds: float) -> int | None:
+    """Index of the line being spoken at ``seconds``: the last line started by then."""
+    current = None
+    for index, span in enumerate(spans):
+        if span is None:
+            continue
+        if span[0] <= seconds:
+            current = index
+        else:
+            break
+    return current
+
+
 def align_lines_to_segments(
     text: str,
     segments: list[TranscriptSegment],
@@ -44,25 +109,9 @@ def align_lines_to_segments(
             setattr(segment, attribute, line)
         return len(segments)
 
-    weights = _segment_weights(segments)
-    total_weight = sum(weights) or float(len(segments))
-    boundaries: list[float] = []
-    running = 0.0
-    for weight in weights:
-        running += weight
-        boundaries.append(running / total_weight)
-
     grouped: list[list[str]] = [[] for _ in segments]
-    total_chars = sum(len(line) for line in lines) or 1
-    position = 0
-    for line in lines:
-        center = (position + len(line) / 2) / total_chars
-        index = next(
-            (position_ for position_, edge in enumerate(boundaries) if center <= edge),
-            len(segments) - 1,
-        )
+    for line, index in zip(lines, _assign_lines(lines, segments)):
         grouped[index].append(line)
-        position += len(line)
 
     updated = 0
     for segment, group in zip(segments, grouped):

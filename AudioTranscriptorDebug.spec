@@ -14,6 +14,8 @@ a = Analysis(
     datas=collect_data_files("faster_whisper"),
     hiddenimports=[
         "faster_whisper",
+        # Imported lazily by the player, so name it for the Qt multimedia hook.
+        "PySide6.QtMultimedia",
         "ctranslate2",
         "ctranslate2.converters",
         "ctranslate2.models",

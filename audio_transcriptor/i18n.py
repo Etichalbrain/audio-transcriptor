@@ -146,6 +146,42 @@ STRINGS: dict[str, dict[str, str]] = {
         "fr": "AudioTranscriptor par {author} · aversa.design · l’audio reste sur cet ordinateur",
     },
 
+    # --- Player ------------------------------------------------------------
+    "player.play": {
+        "en": "Play", "it": "Riproduci", "de": "Abspielen", "fr": "Lire",
+    },
+    "player.pause": {
+        "en": "Pause", "it": "Pausa", "de": "Pause", "fr": "Pause",
+    },
+    "player.from_cursor": {
+        "en": "Play from cursor", "it": "Ascolta da qui", "de": "Ab Cursor abspielen",
+        "fr": "Écouter d’ici",
+    },
+    "player.back": {
+        "en": "Back 5 seconds", "it": "Indietro di 5 secondi", "de": "5 Sekunden zurück",
+        "fr": "Reculer de 5 secondes",
+    },
+    "player.forward": {
+        "en": "Forward 5 seconds", "it": "Avanti di 5 secondi", "de": "5 Sekunden vor",
+        "fr": "Avancer de 5 secondes",
+    },
+    "player.position": {
+        "en": "Playback position", "it": "Posizione di ascolto", "de": "Wiedergabeposition",
+        "fr": "Position de lecture",
+    },
+    "player.shortcuts": {
+        "en": "{play} play/pause · {jump} play from the cursor line · {back} / {fwd} 5 s back / forward",
+        "it": "{play} riproduci/pausa · {jump} ascolta dalla riga del cursore · {back} / {fwd} 5 s indietro / avanti",
+        "de": "{play} Abspielen/Pause · {jump} ab der Cursorzeile abspielen · {back} / {fwd} 5 s zurück / vor",
+        "fr": "{play} lecture/pause · {jump} écouter depuis la ligne du curseur · {back} / {fwd} 5 s en arrière / en avant",
+    },
+    "player.unavailable": {
+        "en": "Audio playback is not available on this computer. Transcription and export still work.",
+        "it": "La riproduzione audio non è disponibile su questo computer. Trascrizione ed esportazione funzionano comunque.",
+        "de": "Die Audiowiedergabe ist auf diesem Computer nicht verfügbar. Transkription und Export funktionieren weiterhin.",
+        "fr": "La lecture audio n’est pas disponible sur cet ordinateur. La transcription et l’export fonctionnent toujours.",
+    },
+
     # --- Status ------------------------------------------------------------
     "status.title": {
         "en": "Status", "it": "Stato", "de": "Status", "fr": "État",

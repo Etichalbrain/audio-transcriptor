@@ -6,6 +6,9 @@
 2. Click `Scegli file` or drag a media file into the upload area.
 3. Click `Trascrivi in italiano`.
 4. Review and edit the Italian transcript.
+   While correcting, use the player above the text: the sentence being spoken is highlighted.
+   Put the cursor on a line and press Ctrl+J (Cmd+J on a Mac) to hear it; Esc plays or pauses;
+   Ctrl+[ and Ctrl+] move 5 seconds back or forward.
 5. Click `Traduci in inglese`. A confirmation shows how many sentences and characters will be
    sent to OpenAI; tick `Non chiedere più` to skip it next time (re-enable it in Settings).
 6. Review and edit the English translation.

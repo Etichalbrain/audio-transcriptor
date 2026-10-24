@@ -5,7 +5,7 @@ import sys
 from html import escape
 from pathlib import Path
 
-from PySide6.QtCore import QByteArray, QLocale, QPointF, QThreadPool, Qt, QUrl, Signal
+from PySide6.QtCore import QByteArray, QLocale, QPointF, QThreadPool, QTimer, Qt, QUrl, Signal
 from PySide6.QtGui import (
     QColor,
     QDesktopServices,
@@ -16,6 +16,10 @@ from PySide6.QtGui import (
     QPen,
     QPixmap,
     QPolygonF,
+    QKeySequence,
+    QShortcut,
+    QTextCursor,
+    QTextFormat,
 )
 from PySide6.QtWidgets import (
     QApplication,
@@ -32,6 +36,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QSizePolicy,
+    QSlider,
     QSplitter,
     QTextEdit,
     QVBoxLayout,
@@ -40,7 +45,7 @@ from PySide6.QtWidgets import (
 
 from audio_transcriptor import __version__, i18n
 from audio_transcriptor.diagnostics import legal_document_path
-from audio_transcriptor.alignment import align_lines_to_segments
+from audio_transcriptor.alignment import align_lines_to_segments, line_at_time, line_time_spans
 from audio_transcriptor.exporters import write_docx, write_srt, write_txt
 from audio_transcriptor.i18n import tr, tr_n
 from audio_transcriptor.models import TranscriptSegment, is_supported_media
@@ -955,6 +960,58 @@ class MainWindow(QMainWindow):
         self.en_pane_count = QLabel("")
         self.en_pane_count.setObjectName("muted")
 
+        # Player: listen while correcting. QtMultimedia is created lazily on the
+        # first play, so tests, screenshots and machines without an audio
+        # backend never pay for it.
+        self.player = None
+        self._audio_output = None
+        self._player_failed = False
+        self._player_source: Path | None = None
+        self._pending_seek_ms: int | None = None
+        self._spans: dict[str, list] = {"it": [], "en": []}
+        self._spans_dirty = True
+        self._highlighted: dict[str, int | None] = {"it": None, "en": None}
+        self._slider_dragging = False
+        self.play_button = QPushButton()
+        self.play_button.setObjectName("secondary")
+        self.play_button.clicked.connect(self.toggle_playback)
+        self.back_button = QPushButton("−5 s")
+        self.back_button.setObjectName("ghost")
+        self.back_button.clicked.connect(lambda: self.seek_relative(-5))
+        self.forward_button = QPushButton("+5 s")
+        self.forward_button.setObjectName("ghost")
+        self.forward_button.clicked.connect(lambda: self.seek_relative(5))
+        self.from_cursor_button = QPushButton()
+        self.from_cursor_button.setObjectName("ghost")
+        self.from_cursor_button.clicked.connect(self.play_from_cursor)
+        self.position_slider = QSlider(Qt.Orientation.Horizontal)
+        self.position_slider.setRange(0, 0)
+        self.position_slider.sliderPressed.connect(self._on_slider_pressed)
+        self.position_slider.sliderReleased.connect(self._on_slider_released)
+        self.time_label = QLabel("0:00")
+        self.time_label.setObjectName("muted")
+        self.shortcut_hint = QLabel()
+        self.shortcut_hint.setObjectName("muted")
+        self.shortcut_hint.setStyleSheet("font-size: 12px;")
+        self.player_timer = QTimer(self)
+        self.player_timer.setInterval(150)
+        self.player_timer.timeout.connect(self._on_player_tick)
+        self.italian_text.textChanged.connect(self._mark_spans_dirty)
+        self.english_text.textChanged.connect(self._mark_spans_dirty)
+        # Esc is free in a text editor and is what transcription tools use;
+        # Ctrl maps to Cmd on macOS.
+        self.shortcut_play = QKeySequence(Qt.Key.Key_Escape)
+        self.shortcut_jump = QKeySequence("Ctrl+J")
+        self.shortcut_back = QKeySequence("Ctrl+[")
+        self.shortcut_forward = QKeySequence("Ctrl+]")
+        for sequence, slot in (
+            (self.shortcut_play, self.toggle_playback),
+            (self.shortcut_jump, self.play_from_cursor),
+            (self.shortcut_back, lambda: self.seek_relative(-5)),
+            (self.shortcut_forward, lambda: self.seek_relative(5)),
+        ):
+            QShortcut(sequence, self, activated=slot)
+
         # Banners
         self.error_label = QLabel("")
         self.error_label.setWordWrap(True)
@@ -1075,6 +1132,23 @@ class MainWindow(QMainWindow):
         work_head.addWidget(self.export_button)
         work_layout.addLayout(work_head)
 
+        self.player_bar = QWidget()
+        player_box = QVBoxLayout(self.player_bar)
+        player_box.setContentsMargins(0, 0, 0, 0)
+        player_box.setSpacing(2)
+        player_row = QHBoxLayout()
+        player_row.setSpacing(8)
+        player_row.addWidget(self.play_button)
+        player_row.addWidget(self.back_button)
+        player_row.addWidget(self.forward_button)
+        player_row.addWidget(self.position_slider, stretch=1)
+        player_row.addWidget(self.time_label)
+        player_row.addWidget(self.from_cursor_button)
+        player_box.addLayout(player_row)
+        player_box.addWidget(self.shortcut_hint)
+        self.player_bar.hide()
+        work_layout.addWidget(self.player_bar)
+
         self.work_splitter = QSplitter()
         self.work_splitter.setChildrenCollapsible(False)
 
@@ -1165,6 +1239,7 @@ class MainWindow(QMainWindow):
         # thread does not try to emit on already-destroyed signals.
         if self.current_worker is not None:
             self.current_worker.cancel()
+        self.stop_playback()
         super().closeEvent(event)
 
     def apply_theme(self) -> None:
@@ -1201,6 +1276,23 @@ class MainWindow(QMainWindow):
         self.error_dismiss.setText(tr("action.close"))
         self.open_folder_button.setText(tr("action.open_folder"))
         self.footer_label.setText(tr("footer", author=AUTHOR))
+        self._render_play_button()
+        self.from_cursor_button.setText(tr("player.from_cursor"))
+        self.back_button.setToolTip(tr("player.back"))
+        self.back_button.setAccessibleName(tr("player.back"))
+        self.forward_button.setToolTip(tr("player.forward"))
+        self.forward_button.setAccessibleName(tr("player.forward"))
+        self.position_slider.setAccessibleName(tr("player.position"))
+        native = QKeySequence.SequenceFormat.NativeText
+        self.shortcut_hint.setText(
+            tr(
+                "player.shortcuts",
+                play=self.shortcut_play.toString(native),
+                jump=self.shortcut_jump.toString(native),
+                back=self.shortcut_back.toString(native),
+                fwd=self.shortcut_forward.toString(native),
+            )
+        )
         key, params = self._status
         self.status_label.setText(tr(key, **params))
         if self._error is not None:
@@ -1245,6 +1337,7 @@ class MainWindow(QMainWindow):
         if not is_supported_media(candidate):
             self.show_error_key("error.unsupported")
             return
+        self.stop_playback()
         self.selected_file = candidate
         self._file_duration = probe_duration(candidate)
         self.hide_error_banner()
@@ -1254,6 +1347,7 @@ class MainWindow(QMainWindow):
         self.update_actions()
 
     def clear_file(self) -> None:
+        self.stop_playback()
         self.selected_file = None
         self._file_duration = None
         self.transcript_segments = []
@@ -1296,6 +1390,7 @@ class MainWindow(QMainWindow):
             self.show_error_key("error.disk_precheck")
             return
         self.hide_error_banner()
+        self.stop_playback()
         self.set_processing("status.preparing_audio", 0)
         self.italian_text.clear()
         self.english_text.clear()
@@ -1374,6 +1469,211 @@ class MainWindow(QMainWindow):
     def on_worker_finished(self) -> None:
         self.current_worker = None
         self.update_actions()
+
+    # --- Player --------------------------------------------------------------
+    def _ensure_player(self) -> bool:
+        """Create the media player on first use and load the selected file."""
+        if self._player_failed or self.selected_file is None:
+            return False
+        if self.player is None:
+            try:
+                from PySide6.QtMultimedia import QAudioOutput, QMediaDevices, QMediaPlayer
+            except ImportError:
+                self._player_unavailable()
+                return False
+            if not QMediaDevices.audioOutputs():
+                # No speakers or headphones right now: say so, but allow a retry
+                # once a device is connected.
+                self.show_error_key("player.unavailable")
+                return False
+            self.player = QMediaPlayer(self)
+            self._audio_output = QAudioOutput(self)
+            self.player.setAudioOutput(self._audio_output)
+            self.player.durationChanged.connect(
+                lambda ms: self.position_slider.setRange(0, max(0, int(ms)))
+            )
+            self.player.playbackStateChanged.connect(self._on_playback_state)
+            self.player.mediaStatusChanged.connect(self._on_media_status)
+            self.player.errorOccurred.connect(self._on_player_error)
+        if self._player_source != self.selected_file:
+            self._pending_seek_ms = None
+            self.player.setSource(QUrl.fromLocalFile(str(self.selected_file)))
+            self._player_source = self.selected_file
+        return True
+
+    def _on_playback_state(self, _state) -> None:
+        # The state arrives asynchronously after play()/pause(): drive the
+        # refresh timer from here, not from the call site.
+        if self.is_playing():
+            self.player_timer.start()
+        else:
+            self.player_timer.stop()
+            self._on_player_tick()
+        self._render_play_button()
+
+    def _on_media_status(self, status) -> None:
+        from PySide6.QtMultimedia import QMediaPlayer
+
+        loaded = (
+            QMediaPlayer.MediaStatus.LoadedMedia,
+            QMediaPlayer.MediaStatus.BufferingMedia,
+            QMediaPlayer.MediaStatus.BufferedMedia,
+        )
+        if status in loaded and self._pending_seek_ms is not None:
+            self.player.setPosition(self._pending_seek_ms)
+            self._pending_seek_ms = None
+
+    def _on_player_error(self, error, message: str = "") -> None:
+        if getattr(error, "value", error):  # NoError is 0
+            self._player_unavailable()
+
+    def _player_unavailable(self) -> None:
+        self._player_failed = True
+        self.stop_playback()
+        self.show_error_key("player.unavailable")
+
+    def is_playing(self) -> bool:
+        if self.player is None:
+            return False
+        from PySide6.QtMultimedia import QMediaPlayer
+
+        return self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState
+
+    def toggle_playback(self) -> None:
+        if not self.player_bar.isVisible() or not self._ensure_player():
+            return
+        if self.is_playing():
+            self.player.pause()
+        else:
+            self.player.play()
+
+    def play_from_cursor(self) -> None:
+        """Start listening at the sentence under the text cursor."""
+        if not self.player_bar.isVisible():
+            return
+        editor, lang = (
+            (self.english_text, "en") if self.english_text.hasFocus() else (self.italian_text, "it")
+        )
+        spans = self._current_spans(lang)
+        line = editor.textCursor().blockNumber()
+        start = next(
+            (span[0] for span in reversed(spans[: line + 1]) if span is not None), None
+        )
+        if start is None:
+            start = next((span[0] for span in spans if span is not None), 0.0)
+        self.seek_to(start, play=True)
+
+    def seek_relative(self, seconds: float) -> None:
+        if not self.player_bar.isVisible():
+            return
+        self.seek_to(max(0.0, self._position_seconds() + seconds), play=None)
+
+    def seek_to(self, seconds: float, play: bool | None) -> None:
+        """Move playback to ``seconds``; play=True starts it, None keeps the state."""
+        if not self._ensure_player():
+            return
+        from PySide6.QtMultimedia import QMediaPlayer
+
+        target = int(seconds * 1000)
+        if self.player.mediaStatus() in (
+            QMediaPlayer.MediaStatus.NoMedia,
+            QMediaPlayer.MediaStatus.LoadingMedia,
+        ):
+            # A seek before the file is loaded is ignored by Qt: apply it on load.
+            self._pending_seek_ms = target
+        else:
+            self.player.setPosition(target)
+        if play:
+            self.player.play()
+        self._on_player_tick(seconds)
+
+    def stop_playback(self) -> None:
+        self.player_timer.stop()
+        if self.player is not None:
+            self.player.stop()
+        self._clear_highlight()
+        self.position_slider.setValue(0)
+        self._render_play_button()
+
+    def _position_seconds(self) -> float:
+        if self.player is not None:
+            if self._pending_seek_ms is not None:
+                return self._pending_seek_ms / 1000
+            return self.player.position() / 1000
+        return self.position_slider.value() / 1000
+
+    def _on_slider_pressed(self) -> None:
+        self._slider_dragging = True
+
+    def _on_slider_released(self) -> None:
+        self._slider_dragging = False
+        self.seek_to(self.position_slider.value() / 1000, play=None)
+
+    def _on_player_tick(self, seconds: float | None = None) -> None:
+        position = self._position_seconds() if seconds is None else seconds
+        if not self._slider_dragging:
+            self.position_slider.setValue(int(position * 1000))
+        self._render_time(position)
+        for lang, editor in (("it", self.italian_text), ("en", self.english_text)):
+            self._highlight_line(lang, editor, line_at_time(self._current_spans(lang), position))
+
+    def _render_time(self, position: float) -> None:
+        total = self._file_duration
+        if self.player is not None and self.player.duration() > 0:
+            total = self.player.duration() / 1000
+        text = _fmt_time(position)
+        self.time_label.setText(f"{text} / {_fmt_time(total)}" if total else text)
+
+    def _render_play_button(self) -> None:
+        self.play_button.setText(tr("player.pause") if self.is_playing() else tr("player.play"))
+
+    def _mark_spans_dirty(self) -> None:
+        self._spans_dirty = True
+
+    def _current_spans(self, lang: str) -> list:
+        if self._spans_dirty:
+            self._spans = {
+                "it": line_time_spans(self.italian_text.toPlainText(), self.transcript_segments),
+                "en": line_time_spans(self.english_text.toPlainText(), self.translation_segments),
+            }
+            self._spans_dirty = False
+            self._highlighted = {"it": None, "en": None}
+        return self._spans[lang]
+
+    def _highlight_line(self, lang: str, editor: QTextEdit, line: int | None) -> None:
+        if self._highlighted.get(lang) == line and editor.extraSelections():
+            return
+        self._highlighted[lang] = line
+        if line is None:
+            editor.setExtraSelections([])
+            return
+        block = editor.document().findBlockByNumber(line)
+        if not block.isValid():
+            editor.setExtraSelections([])
+            return
+        selection = QTextEdit.ExtraSelection()
+        selection.format.setBackground(
+            QColor(ACCENT_TINT if self.settings.theme == "light" else D_ACCENT_TINT)
+        )
+        selection.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
+        selection.cursor = QTextCursor(block)
+        editor.setExtraSelections([selection])
+        if self.is_playing():
+            self._keep_visible(editor, selection.cursor)
+
+    @staticmethod
+    def _keep_visible(editor: QTextEdit, cursor: QTextCursor) -> None:
+        """Scroll only when the spoken line leaves the view, never on every tick."""
+        rect = editor.cursorRect(cursor)
+        height = editor.viewport().height()
+        if rect.top() < 0 or rect.bottom() > height:
+            bar = editor.verticalScrollBar()
+            bar.setValue(bar.value() + rect.top() - height // 3)
+
+    def _clear_highlight(self) -> None:
+        for lang, editor in (("it", self.italian_text), ("en", self.english_text)):
+            self._highlighted[lang] = None
+            editor.setExtraSelections([])
 
     # --- Status / progress / errors -----------------------------------------
     def set_status(self, key: str, kind: str, params: dict | None = None) -> None:
@@ -1480,6 +1780,11 @@ class MainWindow(QMainWindow):
         self.cancel_button.setEnabled(busy)
         self.export_button.setEnabled((has_it or has_en) and not busy)
         self.cancel_button.setVisible(busy)
+        # The player needs timings, which only a transcription provides.
+        can_listen = has_file and bool(self.transcript_segments) and not self._player_failed
+        self.player_bar.setVisible(can_listen)
+        if can_listen and not self.player_timer.isActive():
+            self._render_time(self._position_seconds())
 
     def update_stats(self) -> None:
         it_text = self.italian_text.toPlainText()

@@ -59,6 +59,8 @@ approval steps vary by OS version.
 - **Model choice with honest sizes**: `small` (about 0.5 GB, default), `medium` (~1.5 GB),
   `large-v3` (~3 GB). Downloaded once, cached, reusable offline.
 - **Cancellable downloads**: Cancel Process answers while the model is downloading, not after.
+- **Listen while you correct**: a player with the spoken sentence highlighted, "Play from
+  cursor" (Ctrl/Cmd+J), Esc to play/pause, Ctrl/Cmd+[ and ] to move 5 seconds.
 - **Editable transcript**: fix names and numbers before translating; what you see is what gets
   exported.
 - **Subtitle export that respects your edits**: lines are redistributed over the cues by timing,

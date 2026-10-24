@@ -19,6 +19,8 @@ a = Analysis(
     datas=collect_data_files("faster_whisper"),
     hiddenimports=[
         "faster_whisper",
+        # Imported lazily by the player, so name it for the Qt multimedia hook.
+        "PySide6.QtMultimedia",
         # `import ctranslate2` re-exports these subpackages, so PyInstaller's
         # static analysis misses them and the frozen app fails to transcribe.
         "ctranslate2",
