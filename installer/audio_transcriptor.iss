@@ -3,7 +3,7 @@
 ; Output: installer\Output\AudioTranscriptorSetup-<version>.exe
 
 #define MyAppName "AudioTranscriptor"
-#define MyAppVersion "1.0.1"
+#define MyAppVersion "1.0.2"
 #define MyAppPublisher "Antonio Aversa"
 #define MyAppExeName "AudioTranscriptor.exe"
 

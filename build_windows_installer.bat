@@ -96,7 +96,7 @@ if errorlevel 1 goto error
 echo.
 echo ============================================
 echo Build completata.
-echo Installer: installer\Output\AudioTranscriptorSetup-1.0.1.exe
+echo Installer: installer\Output\AudioTranscriptorSetup-1.0.2.exe
 echo Cartella portable: dist\AudioTranscriptor\
 echo ============================================
 echo.

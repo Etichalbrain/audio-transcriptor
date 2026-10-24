@@ -34,9 +34,9 @@ that a release is available until it is actually published.
 
 | File | What it is | Use it when |
 | --- | --- | --- |
-| **`AudioTranscriptorSetup-1.0.1.exe`** | Windows installer, per-user, no administrator rights | **Recommended on Windows.** Start menu entry, uninstaller, license shown during setup |
+| **`AudioTranscriptorSetup-1.0.2.exe`** | Windows installer, per-user, no administrator rights | **Recommended on Windows.** Start menu entry, uninstaller, license shown during setup |
 | `AudioTranscriptor-Portable.zip` | The same Windows app as a folder | You cannot install software on the PC, or you want to run it from a USB stick |
-| **`AudioTranscriptor-1.0.1-arm64.dmg`** | macOS app bundle (Apple silicon) | **Recommended on a Mac.** Drag it to Applications |
+| **`AudioTranscriptor-1.0.2-arm64.dmg`** | macOS app bundle (Apple silicon) | **Recommended on a Mac.** Drag it to Applications |
 | `SHA256SUMS.txt` | Checksums of every file | You want to verify the download |
 
 The Windows builds are identical inside; the installer only adds shortcuts and the uninstall

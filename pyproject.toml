@@ -1,6 +1,6 @@
 [project]
 name = "audio-transcriptor"
-version = "1.0.1"
+version = "1.0.2"
 description = "Desktop transcription and translation app for Italian audio and video."
 requires-python = ">=3.9"
 dependencies = [

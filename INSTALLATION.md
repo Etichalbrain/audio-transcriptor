@@ -26,7 +26,7 @@ of compliance.
 
 ## Install the Windows app
 
-Download `AudioTranscriptorSetup-1.0.1.exe` from the official download channel linked from <https://aversa.design> once published
+Download `AudioTranscriptorSetup-1.0.2.exe` from the official download channel linked from <https://aversa.design> once published
 and run it. It installs for the current user in `%LOCALAPPDATA%\Programs\AudioTranscriptor`,
 needs no administrator rights, and adds Start menu and (optional) desktop shortcuts.
 
@@ -36,7 +36,7 @@ needs no administrator rights, and adds Start menu and (optional) desktop shortc
 shortcuts and nothing to uninstall, you just delete the folder.
 
 `SHA256SUMS.txt` lists the SHA-256 of both files. Check it before running the installer, for
-example with `Get-FileHash AudioTranscriptorSetup-1.0.1.exe -Algorithm SHA256` in PowerShell.
+example with `Get-FileHash AudioTranscriptorSetup-1.0.2.exe -Algorithm SHA256` in PowerShell.
 
 The installer is not code-signed, so Windows SmartScreen shows "Windows protected your PC";
 choose "More info" → "Run anyway".
@@ -51,7 +51,7 @@ be accepted. The installed folder keeps `LICENSE.txt`, `LICENSE-SUPPLEMENT.md`,
 
 ## Install the macOS app
 
-Download `AudioTranscriptor-1.0.1-arm64.dmg` from the official download channel linked from <https://aversa.design> once published,
+Download `AudioTranscriptor-1.0.2-arm64.dmg` from the official download channel linked from <https://aversa.design> once published,
 open it and drag `AudioTranscriptor` into `Applications`. The app is signed ad-hoc, not
 notarized: the first launch needs right click → Open. The bundle is arm64 only (Apple silicon).
 The legal files are inside `Contents/Resources`.
@@ -118,7 +118,7 @@ every version string matches, and that each build ships the notices.
 
 The script recreates a missing venv, installs the dependencies, builds with
 `AudioTranscriptor.spec`, copies the Silero VAD asset and the legal files, ad-hoc signs the bundle
-and creates `dist/AudioTranscriptor-1.0.1-arm64.dmg`. The bundle version comes from `audio_transcriptor/__init__.py`.
+and creates `dist/AudioTranscriptor-1.0.2-arm64.dmg`. The bundle version comes from `audio_transcriptor/__init__.py`.
 
 To regenerate the README screenshot (`docs/app.png`):
 
@@ -140,11 +140,11 @@ The workflow runs the test suite first, then builds `dist\AudioTranscriptor\` wi
 and the python-docx template are present, wraps the folder with Inno Setup 6, writes
 `SHA256SUMS.txt` and, for a tag, publishes the release.
 
-Pushing a tag such as `v1.0.1` publishes the release. The tag must match the app version or the
+Pushing a tag such as `v1.0.2` publishes the release. The tag must match the app version or the
 workflow fails.
 
 On a Windows PC, run `build_windows_installer.bat` instead (Python 3.12 + Inno Setup 6). It writes
-`installer\Output\AudioTranscriptorSetup-1.0.1.exe`.
+`installer\Output\AudioTranscriptorSetup-1.0.2.exe`.
 
 ## First Launch
 

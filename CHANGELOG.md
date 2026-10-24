@@ -3,7 +3,7 @@
 All notable changes to AudioTranscriptor. Versions follow the app version in
 `audio_transcriptor/__init__.py`.
 
-## Unreleased
+## 1.0.2 - 2026-10-24
 
 ### Listen while correcting
 
@@ -58,14 +58,14 @@ All notable changes to AudioTranscriptor. Versions follow the app version in
 - Offscreen UI tests for counters, progress visibility, file metadata, model
   chip, translation confirmation and live language switching.
 
-## 1.0.1 — 2026-10-22
+### Earlier: 1.0.1 (2026-10-22)
 
 First release of **AudioTranscriptor** (rename of the previous working name).
 Local faster-whisper transcription of Italian audio and video, optional OpenAI
 translation to English, and TXT/SRT/DOCX export remain the core workflow;
 transcription progress reporting has been corrected as described below.
 
-### Interface
+#### Interface
 
 - New interface aligned with the design mockup: warm paper-grey background,
   white rounded cards, blue accent, state-driven layout (empty upload state,
@@ -76,7 +76,7 @@ transcription progress reporting has been corrected as described below.
   English), settings split into Model/Translation sections, About redesigned
   with credits, privacy, license and AI-transparency notes.
 
-### Behavior fixes
+#### Behavior fixes
 
 - Transcription progress is now time-based, so long files (e.g. one-hour
   recordings) advance smoothly instead of parking at 95%.
@@ -84,7 +84,7 @@ transcription progress reporting has been corrected as described below.
 - Clearing the selected file fully resets the workspace; dropping a file while
   a job is running is ignored; error/success banners never overlap.
 
-### Legal and distribution
+#### Legal and distribution
 
 - **License changed to Apache License 2.0 + Commons Clause License Condition
   v1.0**: source-available, not open source and not vanilla Apache-2.0.
